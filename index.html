@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Jesse Funny Face</title>
 
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Jesse Face">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#000000">
+
   <!-- MediaPipe Face Mesh & Camera Utils -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
@@ -44,17 +51,31 @@
     }
     #flash-overlay.flash { opacity: 0.9; }
 
+    /* Countdown Display */
+    #countdown-overlay {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 110px;
+      font-weight: 900;
+      color: #FFD700;
+      z-index: 45;
+      text-shadow: 0 0 25px rgba(0,0,0,0.9);
+      pointer-events: none;
+      display: none;
+    }
+
     /* Top App Header & Controls */
     #top-header {
       position: absolute;
       top: 0; left: 0; right: 0;
       z-index: 30;
       background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
-      padding: 14px 12px 16px 12px;
+      padding: 12px 10px 16px 10px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     #brand-title {
@@ -62,21 +83,21 @@
       align-items: center;
       gap: 8px;
       color: #FFD700;
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 800;
       text-shadow: 0 2px 8px rgba(0,0,0,0.8);
       letter-spacing: 0.5px;
     }
 
     #app-thumbnail {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       background: #FFD700;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
+      font-size: 20px;
       box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
       border: 2px solid #FFF;
     }
@@ -86,17 +107,17 @@
       display: flex;
       justify-content: center;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
       width: 100%;
     }
 
     .action-btn {
       background: rgba(20, 20, 20, 0.75);
       color: white;
-      border: 1.5px solid rgba(255, 255, 255, 0.4);
-      border-radius: 20px;
-      padding: 7px 12px;
-      font-size: 13px;
+      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      border-radius: 18px;
+      padding: 6px 11px;
+      font-size: 12px;
       font-weight: 600;
       display: flex;
       align-items: center;
@@ -118,7 +139,7 @@
       100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
     }
 
-    /* Face Detection Reticle Prompt */
+    /* Reticle Prompt */
     #face-reticle {
       position: absolute;
       top: 50%; left: 50%;
@@ -137,19 +158,49 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Active Filter Name Label */
+    /* Category Navigation Tabs */
+    #category-tabs {
+      position: absolute;
+      bottom: calc(135px + env(safe-area-inset-bottom, 20px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 22;
+      display: flex;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 4px 8px;
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .cat-tab {
+      color: rgba(255,255,255,0.7);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .cat-tab.active {
+      background: #FFD700;
+      color: #000;
+    }
+
+    /* Active Filter Label */
     #filter-label {
       position: absolute;
-      bottom: calc(130px + env(safe-area-inset-bottom, 20px));
+      bottom: calc(175px + env(safe-area-inset-bottom, 20px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 20;
       background: rgba(0, 0, 0, 0.85);
       color: #FFF;
-      padding: 6px 18px;
-      border-radius: 20px;
+      padding: 5px 16px;
+      border-radius: 18px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       pointer-events: none;
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 215, 0, 0.5);
@@ -157,10 +208,10 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
-    /* Elevated Filter Carousel */
+    /* Filter Carousel */
     #filter-bar {
       position: absolute;
-      bottom: calc(40px + env(safe-area-inset-bottom, 20px));
+      bottom: calc(35px + env(safe-area-inset-bottom, 20px));
       left: 0; right: 0;
       z-index: 20;
       display: flex;
@@ -169,18 +220,18 @@
       padding: 10px 20px;
       scroll-behavior: smooth;
       -webkit-overflow-scrolling: touch;
-      background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+      background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%);
     }
     #filter-bar::-webkit-scrollbar { display: none; }
     
     .filter-btn {
       flex: 0 0 auto;
-      width: 62px; height: 62px;
+      width: 60px; height: 60px;
       border-radius: 50%;
       background: rgba(30, 30, 30, 0.85);
       border: 2px solid rgba(255, 255, 255, 0.35);
       color: white;
-      font-size: 28px;
+      font-size: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -201,12 +252,12 @@
     <video id="webcam" playsinline autoplay muted></video>
     <canvas id="output_canvas"></canvas>
     <div id="flash-overlay"></div>
+    <div id="countdown-overlay">3</div>
     <div id="face-reticle">🎯 Position your face in frame</div>
 
-    <!-- Hidden file input for custom face uploads -->
     <input type="file" id="custom-face-input" accept="image/*" style="display:none" onchange="handleCustomFaceUpload(event)">
 
-    <!-- Top App Header -->
+    <!-- Top Header -->
     <div id="top-header">
       <div id="brand-title">
         <div id="app-thumbnail">🤪</div>
@@ -214,11 +265,22 @@
       </div>
       <div id="action-bar">
         <button class="action-btn" id="photo-btn" onclick="takePhoto()">📸 Photo</button>
+        <button class="action-btn" id="timer-btn" onclick="startCountdown(3)">⏱️ 3s Timer</button>
         <button class="action-btn" id="rec-btn" onclick="toggleRecording()">🎥 Record</button>
+        <button class="action-btn" id="voice-btn" onclick="toggleVoiceEffect()">🎙️ Voice: Normal</button>
+        <button class="action-btn" id="mood-btn" onclick="toggleColorMood()">🎨 Mood: Normal</button>
         <button class="action-btn" id="flip-btn" onclick="switchCamera()">🔄 Flip</button>
         <button class="action-btn" id="upload-btn" onclick="document.getElementById('custom-face-input').click()">🖼️ Upload</button>
         <button class="action-btn" id="sound-btn" onclick="toggleSound()">🔊 Sound ON</button>
       </div>
+    </div>
+
+    <!-- Category Tabs -->
+    <div id="category-tabs">
+      <div class="cat-tab active" onclick="switchCategory('all')">All</div>
+      <div class="cat-tab" onclick="switchCategory('trending')">🔥 Trending</div>
+      <div class="cat-tab" onclick="switchCategory('realistic')">👴 Realistic</div>
+      <div class="cat-tab" onclick="switchCategory('vfx')">🤪 VFX & Fun</div>
     </div>
 
     <div id="filter-label">1. Big Mouth Pixel Warp</div>
@@ -232,6 +294,7 @@
     const filterBar = document.getElementById('filter-bar');
     const filterLabel = document.getElementById('filter-label');
     const faceReticle = document.getElementById('face-reticle');
+    const countdownOverlay = document.getElementById('countdown-overlay');
 
     let currentFilterIndex = 0;
     let soundEnabled = true;
@@ -240,6 +303,21 @@
     let cameraInstance = null;
     let noFaceFrameCounter = 0;
     let customMaskImage = null;
+    let activeCategory = 'all';
+
+    // Color Mood Presets
+    const MOOD_PRESETS = [
+      { name: "Normal", filter: "none" },
+      { name: "VHS 📼", filter: "contrast(1.35) saturate(1.4) hue-rotate(-10deg)" },
+      { name: "Cyber Neon 🌆", filter: "contrast(1.4) saturate(2) drop-shadow(0 0 8px #FF00FF)" },
+      { name: "B&W Noir 🎬", filter: "grayscale(100%) contrast(1.3)" },
+      { name: "Warm Sunset 🌅", filter: "sepia(40%) saturate(1.5) contrast(1.1)" }
+    ];
+    let currentMoodIndex = 0;
+
+    // Voice Effect Modes
+    const VOICE_MODES = ["Normal", "Helium 🎈", "Deep Monster 👹"];
+    let currentVoiceIndex = 0;
 
     // --- Web Audio Synthesizer ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -330,13 +408,25 @@
       btn.innerText = soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF";
     }
 
+    function toggleColorMood() {
+      currentMoodIndex = (currentMoodIndex + 1) % MOOD_PRESETS.length;
+      document.getElementById('mood-btn').innerText = `🎨 Mood: ${MOOD_PRESETS[currentMoodIndex].name}`;
+      playSound('pop');
+    }
+
+    function toggleVoiceEffect() {
+      currentVoiceIndex = (currentVoiceIndex + 1) % VOICE_MODES.length;
+      document.getElementById('voice-btn').innerText = `🎙️ Voice: ${VOICE_MODES[currentVoiceIndex]}`;
+      playSound('pop');
+    }
+
     function makeImage(svgString) {
       const img = new Image();
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
       return img;
     }
 
-    // High-Detail Photorealistic Graphical Assets
+    // High-Detail Assets
     const ASSETS = {
       oldGrandpa: makeImage(`
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 450">
@@ -421,56 +511,71 @@
       `)
     };
 
-    // --- 30 Human TikTok & Snapchat AR Filters ---
+    // Filter Database with Category Tagging
     const FILTER_LIST = [
-      { id: 0,  icon: "👄", name: "1. Big Mouth Pixel Warp", sound: 'boing', type: 'warp_mouth' },
-      { id: 1,  icon: "👀", name: "2. Alien Big Eyes Warp", sound: 'zap', type: 'warp_eyes' },
-      { id: 2,  icon: "🖼️", name: "3. Custom Mask Upload", sound: 'pop', type: 'custom_upload' },
-      { id: 3,  icon: "👴", name: "4. Realistic Old Grandpa", sound: 'honk', type: 'mask', asset: ASSETS.oldGrandpa, scaleMult: 1.1 },
-      { id: 4,  icon: "👵", name: "5. Realistic Old Grandma", sound: 'squeak', type: 'mask', asset: ASSETS.oldGrandma, scaleMult: 1.1 },
-      { id: 5,  icon: "😲", name: "6. TikTok Shocked Face", sound: 'zap', type: 'mask', asset: ASSETS.shockedHuman, scaleMult: 1.0 },
-      { id: 6,  icon: "😁", name: "7. Big Toothy Smile", sound: 'pop', type: 'mouth_mask', asset: ASSETS.bigSmile, scaleMult: 0.9 },
-      { id: 7,  icon: "😭", name: "8. Funny Crying Face", sound: 'boing', type: 'mask', asset: ASSETS.cryingHuman, scaleMult: 1.0 },
-      { id: 8,  icon: "🗿", name: "9. Gigachad Model Jaw", sound: 'zap', type: 'mask', asset: ASSETS.gigachad, scaleMult: 1.1 },
-      { id: 9,  icon: "🧔", name: "10. Realistic Full Beard", sound: 'honk', type: 'mouth_mask', asset: ASSETS.realBeard, scaleMult: 1.0 },
-      { id: 10, icon: "🧛", name: "11. Vampire Fangs", sound: 'zap', type: 'mouth_mask', asset: ASSETS.vampire, scaleMult: 0.8 },
-      { id: 11, icon: "🤪", name: "12. Circus Googly Eyes", sound: 'boing', type: 'custom_googly' },
-      { id: 12, icon: "🕶️", name: "13. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️" },
-      { id: 13, icon: "🤓", name: "14. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓" },
-      { id: 14, icon: "🤡", name: "15. Realistic Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡" },
-      { id: 15, icon: "👨‍🍳", name: "16. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳" },
-      { id: 16, icon: "🥷", name: "17. Shadow Ninja Cloth", sound: 'zap', type: 'emoji', emoji: "🥷" },
-      { id: 17, icon: "🎅", name: "18. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅" },
-      { id: 18, icon: "👑", name: "19. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑" },
-      { id: 19, icon: "🧙", name: "20. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙" },
-      { id: 20, icon: "🏴‍☠️", name: "21. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️" },
-      { id: 21, icon: "🤖", name: "22. Cyborg Metallic Eye", sound: 'zap', type: 'emoji', emoji: "🤖" },
-      { id: 22, icon: "👽", name: "23. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽" },
-      { id: 23, icon: "😈", name: "24. Little Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈" },
-      { id: 24, icon: "😇", name: "25. Holy Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇" },
-      { id: 25, icon: "🤩", name: "26. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩" },
-      { id: 26, icon: "🔥", name: "27. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥" },
-      { id: 27, icon: "🥳", name: "28. Disco Party Human", sound: 'pop', type: 'emoji', emoji: "🥳" },
-      { id: 28, icon: "🧐", name: "29. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐" },
-      { id: 29, icon: "🎭", name: "30. Venetian Masquerade", sound: 'honk', type: 'emoji', emoji: "🎭" }
+      { id: 0,  cat: 'trending', icon: "👄", name: "1. Big Mouth Pixel Warp", sound: 'boing', type: 'warp_mouth' },
+      { id: 1,  cat: 'trending', icon: "👀", name: "2. Alien Big Eyes Warp", sound: 'zap', type: 'warp_eyes' },
+      { id: 2,  cat: 'vfx',      icon: "🖼️", name: "3. Custom Mask Upload", sound: 'pop', type: 'custom_upload' },
+      { id: 3,  cat: 'realistic',icon: "👴", name: "4. Realistic Old Grandpa", sound: 'honk', type: 'mask', asset: ASSETS.oldGrandpa, scaleMult: 1.1 },
+      { id: 4,  cat: 'realistic',icon: "👵", name: "5. Realistic Old Grandma", sound: 'squeak', type: 'mask', asset: ASSETS.oldGrandma, scaleMult: 1.1 },
+      { id: 5,  cat: 'realistic',icon: "😲", name: "6. TikTok Shocked Face", sound: 'zap', type: 'mask', asset: ASSETS.shockedHuman, scaleMult: 1.0 },
+      { id: 6,  cat: 'realistic',icon: "😁", name: "7. Big Toothy Smile", sound: 'pop', type: 'mouth_mask', asset: ASSETS.bigSmile, scaleMult: 0.9 },
+      { id: 7,  cat: 'trending', icon: "😭", name: "8. Funny Crying Face", sound: 'boing', type: 'mask', asset: ASSETS.cryingHuman, scaleMult: 1.0 },
+      { id: 8,  cat: 'trending', icon: "🗿", name: "9. Gigachad Model Jaw", sound: 'zap', type: 'mask', asset: ASSETS.gigachad, scaleMult: 1.1 },
+      { id: 9,  cat: 'realistic',icon: "🧔", name: "10. Realistic Full Beard", sound: 'honk', type: 'mouth_mask', asset: ASSETS.realBeard, scaleMult: 1.0 },
+      { id: 10, cat: 'realistic',icon: "🧛", name: "11. Vampire Fangs", sound: 'zap', type: 'mouth_mask', asset: ASSETS.vampire, scaleMult: 0.8 },
+      { id: 11, cat: 'vfx',      icon: "🤪", name: "12. Circus Googly Eyes", sound: 'boing', type: 'custom_googly' },
+      { id: 12, cat: 'vfx',      icon: "🕶️", name: "13. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️" },
+      { id: 13, cat: 'vfx',      icon: "🤓", name: "14. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓" },
+      { id: 14, cat: 'vfx',      icon: "🤡", name: "15. Realistic Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡" },
+      { id: 15, cat: 'vfx',      icon: "👨‍🍳", name: "16. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳" },
+      { id: 16, cat: 'vfx',      icon: "🥷", name: "17. Shadow Ninja Cloth", sound: 'zap', type: 'emoji', emoji: "🥷" },
+      { id: 17, cat: 'vfx',      icon: "🎅", name: "18. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅" },
+      { id: 18, cat: 'vfx',      icon: "👑", name: "19. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑" },
+      { id: 19, cat: 'vfx',      icon: "🧙", name: "20. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙" },
+      { id: 20, cat: 'vfx',      icon: "🏴‍☠️", name: "21. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️" },
+      { id: 21, cat: 'vfx',      icon: "🤖", name: "22. Cyborg Metallic Eye", sound: 'zap', type: 'emoji', emoji: "🤖" },
+      { id: 22, cat: 'vfx',      icon: "👽", name: "23. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽" },
+      { id: 23, cat: 'vfx',      icon: "😈", name: "24. Little Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈" },
+      { id: 24, cat: 'vfx',      icon: "😇", name: "25. Holy Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇" },
+      { id: 25, cat: 'vfx',      icon: "🤩", name: "26. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩" },
+      { id: 26, cat: 'vfx',      icon: "🔥", name: "27. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥" },
+      { id: 27, cat: 'vfx',      icon: "🥳", name: "28. Disco Party Human", sound: 'pop', type: 'emoji', emoji: "🥳" },
+      { id: 28, cat: 'vfx',      icon: "🧐", name: "29. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐" },
+      { id: 29, cat: 'vfx',      icon: "🎭", name: "30. Venetian Masquerade", sound: 'honk', type: 'emoji', emoji: "🎭" }
     ];
 
-    FILTER_LIST.forEach((f, idx) => {
-      const btn = document.createElement('div');
-      btn.className = `filter-btn ${idx === 0 ? 'active' : ''}`;
-      btn.innerHTML = f.icon;
-      btn.onclick = () => {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilterIndex = idx;
-        filterLabel.innerText = f.name;
-        playSound(f.sound);
-        if (f.type === 'custom_upload' && !customMaskImage) {
-          document.getElementById('custom-face-input').click();
-        }
-      };
-      filterBar.appendChild(btn);
-    });
+    function renderFilterButtons() {
+      filterBar.innerHTML = '';
+      FILTER_LIST.forEach((f, idx) => {
+        if (activeCategory !== 'all' && f.cat !== activeCategory) return;
+
+        const btn = document.createElement('div');
+        btn.className = `filter-btn ${idx === currentFilterIndex ? 'active' : ''}`;
+        btn.innerHTML = f.icon;
+        btn.onclick = () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilterIndex = idx;
+          filterLabel.innerText = f.name;
+          playSound(f.sound);
+          if (f.type === 'custom_upload' && !customMaskImage) {
+            document.getElementById('custom-face-input').click();
+          }
+        };
+        filterBar.appendChild(btn);
+      });
+    }
+
+    function switchCategory(cat) {
+      activeCategory = cat;
+      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      renderFilterButtons();
+      playSound('pop');
+    }
+
+    renderFilterButtons();
 
     function syncCanvasSize() {
       canvasElement.width = window.innerWidth;
@@ -479,7 +584,7 @@
     window.addEventListener('resize', syncCanvasSize);
     syncCanvasSize();
 
-    // Custom Face Photo Upload Handler
+    // Custom Face Photo Upload
     function handleCustomFaceUpload(event) {
       const file = event.target.files[0];
       if (file) {
@@ -506,6 +611,26 @@
       }
     }
 
+    // 3-Second Hands-Free Countdown Timer
+    function startCountdown(seconds) {
+      let count = seconds;
+      playSound('pop');
+      countdownOverlay.innerText = count;
+      countdownOverlay.style.display = 'block';
+
+      const timerInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownOverlay.innerText = count;
+          playSound('boing');
+        } else {
+          clearInterval(timerInterval);
+          countdownOverlay.style.display = 'none';
+          takePhoto();
+        }
+      }, 1000);
+    }
+
     // Native Photo Snapshot + Share Sheet
     async function takePhoto() {
       playSound('pop');
@@ -527,7 +652,6 @@
             console.log("Share canceled", err);
           }
         } else {
-          // Fallback Download
           const link = document.createElement('a');
           link.download = file.name;
           link.href = URL.createObjectURL(blob);
@@ -537,7 +661,7 @@
       }, 'image/png');
     }
 
-    // Video Recording with Live Audio Capture
+    // Video Recording with Live Microphone + Voice Pitch Processing
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
@@ -551,12 +675,30 @@
         let finalStream = canvasStream;
 
         try {
-          // Capture microphone audio to include voice in recording
           const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const combinedTracks = [...canvasStream.getVideoTracks(), ...micStream.getAudioTracks()];
+          const micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const source = micAudioCtx.createMediaStreamSource(micStream);
+          const filter = micAudioCtx.createBiquadFilter();
+
+          // Apply Voice FX Nodes
+          if (currentVoiceIndex === 1) { // Helium
+            filter.type = 'highpass';
+            filter.frequency.value = 1100;
+          } else if (currentVoiceIndex === 2) { // Deep Monster
+            filter.type = 'lowpass';
+            filter.frequency.value = 450;
+          } else {
+            filter.type = 'allpass';
+          }
+
+          const dest = micAudioCtx.createMediaStreamDestination();
+          source.connect(filter);
+          filter.connect(dest);
+
+          const combinedTracks = [...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()];
           finalStream = new MediaStream(combinedTracks);
         } catch (err) {
-          console.warn("Microphone permission denied, recording video without sound.");
+          console.warn("Microphone unavailable, recording without audio stream.");
         }
 
         let mimeType = 'video/webm';
@@ -613,7 +755,7 @@
       canvasCtx.restore();
     }
 
-    // Real-Time Canvas Pixel Warping Engine (Big Mouth & Alien Eyes)
+    // Pixel Warping Engine
     function applyPixelWarp(type, f) {
       const s = f.scale;
       if (type === 'warp_mouth') {
@@ -622,7 +764,6 @@
         canvasCtx.beginPath();
         canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
         canvasCtx.clip();
-        // Magnify mouth area 2.2x
         canvasCtx.drawImage(
           canvasElement,
           f.mouth.x - radius / 2, f.mouth.y - radius / 2, radius, radius,
@@ -636,7 +777,6 @@
           canvasCtx.beginPath();
           canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
           canvasCtx.clip();
-          // Magnify eyes 1.8x
           canvasCtx.drawImage(
             canvasElement,
             eye.x - radius / 2, eye.y - radius / 2, radius, radius,
@@ -647,7 +787,19 @@
       }
     }
 
-    // --- MediaPipe Frame Processing Loop ---
+    // Branded Social Watermark Overlay
+    function drawWatermark(w, h) {
+      canvasCtx.save();
+      canvasCtx.font = "bold 15px -apple-system, BlinkMacSystemFont, sans-serif";
+      canvasCtx.fillStyle = "rgba(255, 215, 0, 0.85)";
+      canvasCtx.textAlign = "right";
+      canvasCtx.shadowColor = "rgba(0, 0, 0, 0.8)";
+      canvasCtx.shadowBlur = 4;
+      canvasCtx.fillText("🤪 Jesse Funny Face", w - 16, h - 210);
+      canvasCtx.restore();
+    }
+
+    // --- MediaPipe Processing Loop ---
     function onResults(results) {
       const w = canvasElement.width;
       const h = canvasElement.height;
@@ -655,13 +807,19 @@
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, w, h);
 
-      // Handle horizontal mirroring for front camera
+      // Apply Color Mood Preset Filter
+      canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
+
+      // Handle horizontal camera mirroring
       if (isFrontCamera) {
         canvasCtx.translate(w, 0);
         canvasCtx.scale(-1, 1);
       }
       canvasCtx.drawImage(results.image, 0, 0, w, h);
       canvasCtx.restore();
+
+      // Reset filter for UI overlay elements
+      canvasCtx.filter = "none";
 
       if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         noFaceFrameCounter = 0;
@@ -688,7 +846,7 @@
           const scale = Math.max(eyeDist / 70, 0.4);
           const angle = Math.atan2(screenRightEye.y - screenLeftEye.y, screenRightEye.x - screenLeftEye.x);
 
-          // Trigger mouth open sound effect
+          // Mouth open triggers sound effect
           const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
           if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
             playSound(FILTER_LIST[currentFilterIndex].sound);
@@ -703,6 +861,9 @@
           faceReticle.style.display = 'block';
         }
       }
+
+      // Draw watermark on canvas
+      drawWatermark(w, h);
     }
 
     function renderFilter(idx, f) {
@@ -753,7 +914,6 @@
       });
     }
 
-    // Initialize Face Mesh Engine
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
