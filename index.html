@@ -277,10 +277,10 @@
 
     <!-- Category Tabs -->
     <div id="category-tabs">
-      <div class="cat-tab active" onclick="switchCategory('all')">All</div>
-      <div class="cat-tab" onclick="switchCategory('trending')">🔥 Trending</div>
-      <div class="cat-tab" onclick="switchCategory('realistic')">👴 Realistic</div>
-      <div class="cat-tab" onclick="switchCategory('vfx')">🤪 VFX & Fun</div>
+      <div class="cat-tab active" onclick="switchCategory('all', this)">All</div>
+      <div class="cat-tab" onclick="switchCategory('trending', this)">🔥 Trending</div>
+      <div class="cat-tab" onclick="switchCategory('realistic', this)">👴 Realistic</div>
+      <div class="cat-tab" onclick="switchCategory('vfx', this)">🤪 VFX & Fun</div>
     </div>
 
     <div id="filter-label">1. Realistic Aged Face (Wrinkles & Sunken Cheeks)</div>
@@ -295,6 +295,10 @@
     const filterLabel = document.getElementById('filter-label');
     const faceReticle = document.getElementById('face-reticle');
     const countdownOverlay = document.getElementById('countdown-overlay');
+
+    // Offscreen Canvas to prevent canvas feedback loops & freezes
+    const offscreenCanvas = document.createElement('canvas');
+    const offscreenCtx = offscreenCanvas.getContext('2d');
 
     let currentFilterIndex = 0;
     let soundEnabled = true;
@@ -420,7 +424,7 @@
       playSound('pop');
     }
 
-    // MediaPipe Landmark Mesh Outer Contour Indices
+    // Landmark Indices
     const LIPS_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
     const LIPS_INNER = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191];
     const L_EYE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
@@ -429,7 +433,7 @@
     const R_EYEBROW = [300, 293, 334, 296, 336];
     const JAWLINE = [172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397];
 
-    // Filter Database with Landmark Vector Renderers
+    // Filter Database
     const FILTER_LIST = [
       { id: 0,  cat: 'realistic', icon: "👴", name: "1. Realistic Aged Face (Wrinkles & Sunken Cheeks)", sound: 'honk', type: 'vector_aged' },
       { id: 1,  cat: 'realistic', icon: "💄", name: "2. Hollywood Glam Makeup & Contour", sound: 'squeak', type: 'vector_makeup' },
@@ -439,28 +443,26 @@
       { id: 5,  cat: 'trending',  icon: "👀", name: "6. Alien Big Eyes Warp", sound: 'zap', type: 'warp_eyes' },
       { id: 6,  cat: 'vfx',       icon: "🤖", name: "7. Cyberpunk 3D Face Wireframe", sound: 'zap', type: 'vector_cyberpunk' },
       { id: 7,  cat: 'trending',  icon: "😭", name: "8. Realistic Tear Stream Contour", sound: 'boing', type: 'vector_crying' },
-      { id: 8,  cat: 'realistic', icon: "🧔", name: "9. Full Stubble & Shadow Beard", sound: 'honk', type: 'vector_stubble' },
-      { id: 9,  cat: 'vfx',       icon: "💀", name: "10. Sugar Skull Face Art", sound: 'fart', type: 'vector_skull' },
-      { id: 10, cat: 'vfx',       icon: "🖼️", name: "11. Custom Mask Upload", sound: 'pop', type: 'custom_upload' },
-      { id: 11, cat: 'vfx',       icon: "🤪", name: "12. Circus Googly Eyes", sound: 'boing', type: 'custom_googly' },
-      { id: 12, cat: 'vfx',       icon: "🕶️", name: "13. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️" },
-      { id: 13, cat: 'vfx',       icon: "🤓", name: "14. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓" },
-      { id: 14, cat: 'vfx',       icon: "🤡", name: "15. Realistic Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡" },
-      { id: 15, cat: 'vfx',       icon: "👨‍🍳", name: "16. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳" },
-      { id: 16, cat: 'vfx',       icon: "🥷", name: "17. Shadow Ninja Mask", sound: 'zap', type: 'emoji', emoji: "🥷" },
-      { id: 17, cat: 'vfx',       icon: "🎅", name: "18. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅" },
-      { id: 18, cat: 'vfx',       icon: "👑", name: "19. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑" },
-      { id: 19, cat: 'vfx',       icon: "🧙", name: "20. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙" },
-      { id: 20, cat: 'vfx',       icon: "🏴‍☠️", name: "21. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️" },
-      { id: 21, cat: 'vfx',       icon: "🤖", name: "22. Cyborg Metallic Lens", sound: 'zap', type: 'emoji', emoji: "🤖" },
-      { id: 22, cat: 'vfx',       icon: "👽", name: "23. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽" },
-      { id: 23, cat: 'vfx',       icon: "😈", name: "24. Little Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈" },
-      { id: 24, cat: 'vfx',       icon: "😇", name: "25. Holy Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇" },
-      { id: 25, cat: 'vfx',       icon: "🤩", name: "26. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩" },
-      { id: 26, cat: 'vfx',       icon: "🔥", name: "27. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥" },
-      { id: 27, cat: 'vfx',       icon: "🥳", name: "28. Party Celebration", sound: 'pop', type: 'emoji', emoji: "🥳" },
-      { id: 28, cat: 'vfx',       icon: "🧐", name: "29. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐" },
-      { id: 29, cat: 'vfx',       icon: "🎭", name: "30. Venetian Masquerade", sound: 'honk', type: 'emoji', emoji: "🎭" }
+      { id: 8,  cat: 'vfx',       icon: "🖼️", name: "9. Custom Mask Upload", sound: 'pop', type: 'custom_upload' },
+      { id: 9,  cat: 'vfx',       icon: "🤪", name: "10. Circus Googly Eyes", sound: 'boing', type: 'custom_googly' },
+      { id: 10, cat: 'vfx',       icon: "🕶️", name: "11. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️" },
+      { id: 11, cat: 'vfx',       icon: "🤓", name: "12. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓" },
+      { id: 12, cat: 'vfx',       icon: "🤡", name: "13. Realistic Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡" },
+      { id: 13, cat: 'vfx',       icon: "👨‍🍳", name: "14. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳" },
+      { id: 14, cat: 'vfx',       icon: "🥷", name: "15. Shadow Ninja Mask", sound: 'zap', type: 'emoji', emoji: "🥷" },
+      { id: 15, cat: 'vfx',       icon: "🎅", name: "16. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅" },
+      { id: 16, cat: 'vfx',       icon: "👑", name: "17. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑" },
+      { id: 17, cat: 'vfx',       icon: "🧙", name: "18. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙" },
+      { id: 18, cat: 'vfx',       icon: "🏴‍☠️", name: "19. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️" },
+      { id: 19, cat: 'vfx',       icon: "🤖", name: "20. Cyborg Metallic Lens", sound: 'zap', type: 'emoji', emoji: "🤖" },
+      { id: 20, cat: 'vfx',       icon: "👽", name: "21. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽" },
+      { id: 21, cat: 'vfx',       icon: "😈", name: "22. Little Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈" },
+      { id: 22, cat: 'vfx',       icon: "😇", name: "23. Holy Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇" },
+      { id: 23, cat: 'vfx',       icon: "🤩", name: "24. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩" },
+      { id: 24, cat: 'vfx',       icon: "🔥", name: "25. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥" },
+      { id: 25, cat: 'vfx',       icon: "🥳", name: "26. Party Celebration", sound: 'pop', type: 'emoji', emoji: "🥳" },
+      { id: 26, cat: 'vfx',       icon: "🧐", name: "27. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐" },
+      { id: 27, cat: 'vfx',       icon: "🎭", name: "28. Venetian Masquerade", sound: 'honk', type: 'emoji', emoji: "🎭" }
     ];
 
     function renderFilterButtons() {
@@ -485,10 +487,10 @@
       });
     }
 
-    function switchCategory(cat) {
+    function switchCategory(cat, el) {
       activeCategory = cat;
       document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      if (el) el.classList.add('active');
       renderFilterButtons();
       playSound('pop');
     }
@@ -511,7 +513,7 @@
           const img = new Image();
           img.onload = () => {
             customMaskImage = img;
-            filterLabel.innerText = "11. Custom Mask Active";
+            filterLabel.innerText = "9. Custom Mask Active";
           };
           img.src = e.target.result;
         };
@@ -652,20 +654,26 @@
       }
     }
 
-    // --- MediaPipe 468 Landmark Mapping Renderer Engines ---
-
-    // Draw Smooth Curve Connecting Specific MediaPipe Landmark Indices
+    // Safe Landmark Path Helper
     function drawLandmarkPath(pts, indices, isClosed = false) {
-      if (!indices || indices.length === 0) return;
+      if (!pts || !indices || indices.length === 0) return;
       canvasCtx.beginPath();
-      canvasCtx.moveTo(pts[indices[0]].x, pts[indices[0]].y);
-      for (let i = 1; i < indices.length; i++) {
-        canvasCtx.lineTo(pts[indices[i]].x, pts[indices[i]].y);
+      let started = false;
+      for (let i = 0; i < indices.length; i++) {
+        const pt = pts[indices[i]];
+        if (pt && typeof pt.x === 'number' && typeof pt.y === 'number') {
+          if (!started) {
+            canvasCtx.moveTo(pt.x, pt.y);
+            started = true;
+          } else {
+            canvasCtx.lineTo(pt.x, pt.y);
+          }
+        }
       }
-      if (isClosed) canvasCtx.closePath();
+      if (isClosed && started) canvasCtx.closePath();
     }
 
-    // Filter 1: Realistic Aged Face (Wrinkles & Sunken Cheeks)
+    // Filter 1: Aged Face
     function renderAgedFace(pts, scale) {
       canvasCtx.save();
       canvasCtx.globalCompositeOperation = 'multiply';
@@ -673,94 +681,82 @@
       canvasCtx.lineWidth = Math.max(2 * scale, 1.2);
       canvasCtx.lineCap = 'round';
 
-      // Forehead Wrinkles (Connecting forehead landmarks)
-      drawLandmarkPath(pts, [109, 10, 338]); stroke();
-      drawLandmarkPath(pts, [67, 151, 297]); stroke();
-      drawLandmarkPath(pts, [103, 9, 332]); stroke();
+      drawLandmarkPath(pts, [109, 10, 338]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [67, 151, 297]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [103, 9, 332]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [130, 247, 33]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [359, 467, 263]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [205, 206, 92, 165, 61]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [425, 426, 322, 391, 291]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [116, 117, 118, 119]); canvasCtx.stroke();
+      drawLandmarkPath(pts, [345, 346, 347, 348]); canvasCtx.stroke();
 
-      // Crow's Feet Eye Wrinkles
-      drawLandmarkPath(pts, [130, 247, 33]); stroke();
-      drawLandmarkPath(pts, [359, 467, 263]); stroke();
-
-      // Nasolabial Laugh Lines (Nose to Mouth)
-      drawLandmarkPath(pts, [205, 206, 92, 165, 61]); stroke();
-      drawLandmarkPath(pts, [425, 426, 322, 391, 291]); stroke();
-
-      // Under Eye Aging Bags
-      drawLandmarkPath(pts, [116, 117, 118, 119]); stroke();
-      drawLandmarkPath(pts, [345, 346, 347, 348]); stroke();
-
-      // Bushy Silver Eyebrows
       canvasCtx.globalCompositeOperation = 'source-over';
       canvasCtx.strokeStyle = 'rgba(230, 230, 230, 0.85)';
       canvasCtx.lineWidth = 14 * scale;
-      drawLandmarkPath(pts, L_EYEBROW); stroke();
-      drawLandmarkPath(pts, R_EYEBROW); stroke();
+      drawLandmarkPath(pts, L_EYEBROW); canvasCtx.stroke();
+      drawLandmarkPath(pts, R_EYEBROW); canvasCtx.stroke();
 
       canvasCtx.restore();
-      function stroke() { canvasCtx.stroke(); }
     }
 
-    // Filter 2: Hollywood Glam Makeup & Lip Contour
+    // Filter 2: Hollywood Makeup
     function renderMakeup(pts, scale) {
       canvasCtx.save();
-      
-      // Outer Lip Color Gradient
       canvasCtx.fillStyle = 'rgba(193, 18, 31, 0.75)';
       drawLandmarkPath(pts, LIPS_OUTER, true);
       canvasCtx.fill();
 
-      // Inner Lip Opening Cutout
       canvasCtx.globalCompositeOperation = 'destination-out';
       drawLandmarkPath(pts, LIPS_INNER, true);
       canvasCtx.fill();
       canvasCtx.globalCompositeOperation = 'source-over';
 
-      // Eyeliner & Lash Highlights
       canvasCtx.strokeStyle = '#000000';
       canvasCtx.lineWidth = 4 * scale;
       drawLandmarkPath(pts, L_EYE, true); canvasCtx.stroke();
       drawLandmarkPath(pts, R_EYE, true); canvasCtx.stroke();
 
-      // Cheek Contour Blush
-      canvasCtx.fillStyle = 'rgba(255, 105, 180, 0.35)';
-      canvasCtx.beginPath();
-      canvasCtx.arc(pts[234].x, pts[234].y, 30 * scale, 0, 2 * Math.PI);
-      canvasCtx.arc(pts[454].x, pts[454].y, 30 * scale, 0, 2 * Math.PI);
-      canvasCtx.fill();
+      if (pts[234] && pts[454]) {
+        canvasCtx.fillStyle = 'rgba(255, 105, 180, 0.35)';
+        canvasCtx.beginPath();
+        canvasCtx.arc(pts[234].x, pts[234].y, 30 * scale, 0, 2 * Math.PI);
+        canvasCtx.arc(pts[454].x, pts[454].y, 30 * scale, 0, 2 * Math.PI);
+        canvasCtx.fill();
+      }
 
       canvasCtx.restore();
     }
 
-    // Filter 3: Gigachad Chiseled Jaw & Stubble
+    // Filter 3: Gigachad Jaw
     function renderGigachad(pts, scale) {
       canvasCtx.save();
-      // Chiseled Stubble Line along exact jawline
       canvasCtx.strokeStyle = 'rgba(43, 33, 30, 0.75)';
       canvasCtx.lineWidth = 14 * scale;
       canvasCtx.lineCap = 'round';
       drawLandmarkPath(pts, JAWLINE);
       canvasCtx.stroke();
 
-      // Dark Aviator Glasses over eye landmarks
-      canvasCtx.fillStyle = '#111111';
-      canvasCtx.strokeStyle = '#D4AF37';
-      canvasCtx.lineWidth = 4 * scale;
+      if (pts[159] && pts[386]) {
+        canvasCtx.fillStyle = '#111111';
+        canvasCtx.strokeStyle = '#D4AF37';
+        canvasCtx.lineWidth = 4 * scale;
 
-      canvasCtx.beginPath();
-      canvasCtx.ellipse(pts[159].x, pts[159].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
-      canvasCtx.ellipse(pts[386].x, pts[386].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
-      canvasCtx.fill();
-      canvasCtx.stroke();
+        canvasCtx.beginPath();
+        canvasCtx.ellipse(pts[159].x, pts[159].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
+        canvasCtx.ellipse(pts[386].x, pts[386].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
+        canvasCtx.fill();
+        canvasCtx.stroke();
+      }
 
       canvasCtx.restore();
     }
 
-    // Filter 4: Realistic Vampire Fangs
+    // Filter 4: Vampire Fangs
     function renderVampire(pts, scale) {
+      if (!pts[37] || !pts[267]) return;
       canvasCtx.save();
       
-      // Upper Fangs anchored to canine landmarks #37 & #267
       const lFang = pts[37];
       const rFang = pts[267];
       const fangLen = 28 * scale;
@@ -769,7 +765,6 @@
       canvasCtx.strokeStyle = '#CCCCCC';
       canvasCtx.lineWidth = 1.5;
 
-      // Left Fang Triangle
       canvasCtx.beginPath();
       canvasCtx.moveTo(lFang.x - 8 * scale, lFang.y);
       canvasCtx.lineTo(lFang.x + 8 * scale, lFang.y);
@@ -777,7 +772,6 @@
       canvasCtx.closePath();
       canvasCtx.fill(); canvasCtx.stroke();
 
-      // Right Fang Triangle
       canvasCtx.beginPath();
       canvasCtx.moveTo(rFang.x - 8 * scale, rFang.y);
       canvasCtx.lineTo(rFang.x + 8 * scale, rFang.y);
@@ -785,7 +779,6 @@
       canvasCtx.closePath();
       canvasCtx.fill(); canvasCtx.stroke();
 
-      // Blood Drips
       canvasCtx.fillStyle = '#900C3F';
       canvasCtx.beginPath();
       canvasCtx.arc(lFang.x, lFang.y + fangLen + 4, 3 * scale, 0, 2 * Math.PI);
@@ -795,7 +788,7 @@
       canvasCtx.restore();
     }
 
-    // Filter 7: Cyberpunk 3D Wireframe Mesh
+    // Filter 7: Cyberpunk Wireframe
     function renderCyberpunkMesh(pts) {
       canvasCtx.save();
       canvasCtx.strokeStyle = '#00FFFF';
@@ -803,34 +796,28 @@
       canvasCtx.shadowColor = '#00FFFF';
       canvasCtx.shadowBlur = 6;
 
-      // Connect key facial mesh landmarks into 3D wireframe grid
       const meshIndices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-      drawLandmarkPath(pts, meshIndices, true);
-      canvasCtx.stroke();
-
-      // Crosshatch Center Lines
-      drawLandmarkPath(pts, [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2, 164, 0, 11, 12, 13, 14, 15, 16, 17, 18, 200, 199, 175, 152]);
-      canvasCtx.stroke();
+      drawLandmarkPath(pts, meshIndices, true); canvasCtx.stroke();
+      drawLandmarkPath(pts, [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2, 164, 0, 11, 12, 13, 14, 15, 16, 17, 18, 200, 199, 175, 152]); canvasCtx.stroke();
 
       canvasCtx.restore();
     }
 
-    // Filter 8: Realistic Tear Streams
+    // Filter 8: Realistic Tears
     function renderCryingTears(pts, scale) {
+      if (!pts[145] || !pts[374]) return;
       canvasCtx.save();
       canvasCtx.fillStyle = 'rgba(0, 191, 255, 0.75)';
 
       const lEyePt = pts[145];
       const rEyePt = pts[374];
 
-      // Left Eye Tear Stream
       canvasCtx.beginPath();
       canvasCtx.moveTo(lEyePt.x - 6 * scale, lEyePt.y);
       canvasCtx.quadraticCurveTo(lEyePt.x - 12 * scale, lEyePt.y + 60 * scale, lEyePt.x - 5 * scale, lEyePt.y + 120 * scale);
       canvasCtx.quadraticCurveTo(lEyePt.x + 10 * scale, lEyePt.y + 60 * scale, lEyePt.x + 6 * scale, lEyePt.y);
       canvasCtx.fill();
 
-      // Right Eye Tear Stream
       canvasCtx.beginPath();
       canvasCtx.moveTo(rEyePt.x - 6 * scale, rEyePt.y);
       canvasCtx.quadraticCurveTo(rEyePt.x + 12 * scale, rEyePt.y + 60 * scale, rEyePt.x + 5 * scale, rEyePt.y + 120 * scale);
@@ -840,7 +827,7 @@
       canvasCtx.restore();
     }
 
-    // Real-Time Canvas Pixel Warping Engine
+    // Real-Time Canvas Pixel Warping Engine (Using offscreen Canvas to prevent browser freeze)
     function applyPixelWarp(type, f) {
       const s = f.scale;
       if (type === 'warp_mouth') {
@@ -849,9 +836,15 @@
         canvasCtx.beginPath();
         canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
         canvasCtx.clip();
+        
+        const srcX = Math.max(0, f.mouth.x - radius / 2);
+        const srcY = Math.max(0, f.mouth.y - radius / 2);
+        const srcW = Math.min(offscreenCanvas.width - srcX, radius);
+        const srcH = Math.min(offscreenCanvas.height - srcY, radius);
+
         canvasCtx.drawImage(
-          canvasElement,
-          f.mouth.x - radius / 2, f.mouth.y - radius / 2, radius, radius,
+          offscreenCanvas,
+          srcX, srcY, srcW, srcH,
           f.mouth.x - radius, f.mouth.y - radius, radius * 2, radius * 2
         );
         canvasCtx.restore();
@@ -862,9 +855,15 @@
           canvasCtx.beginPath();
           canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
           canvasCtx.clip();
+
+          const srcX = Math.max(0, eye.x - radius / 2);
+          const srcY = Math.max(0, eye.y - radius / 2);
+          const srcW = Math.min(offscreenCanvas.width - srcX, radius);
+          const srcH = Math.min(offscreenCanvas.height - srcY, radius);
+
           canvasCtx.drawImage(
-            canvasElement,
-            eye.x - radius / 2, eye.y - radius / 2, radius, radius,
+            offscreenCanvas,
+            srcX, srcY, srcW, srcH,
             eye.x - radius, eye.y - radius, radius * 2, radius * 2
           );
           canvasCtx.restore();
@@ -905,68 +904,74 @@
 
     // --- MediaPipe Processing Loop ---
     function onResults(results) {
-      const w = canvasElement.width;
-      const h = canvasElement.height;
+      try {
+        const w = canvasElement.width;
+        const h = canvasElement.height;
 
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, w, h);
+        // Render camera frame onto buffer offscreenCanvas to fix GPU feedback locks
+        offscreenCanvas.width = w;
+        offscreenCanvas.height = h;
+        offscreenCtx.save();
+        if (isFrontCamera) {
+          offscreenCtx.translate(w, 0);
+          offscreenCtx.scale(-1, 1);
+        }
+        offscreenCtx.drawImage(results.image, 0, 0, w, h);
+        offscreenCtx.restore();
 
-      // Apply Color Mood Preset Filter
-      canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
+        // Draw main camera background onto visible canvas
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, w, h);
+        canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
+        canvasCtx.drawImage(offscreenCanvas, 0, 0, w, h);
+        canvasCtx.restore();
 
-      // Handle horizontal camera mirroring
-      if (isFrontCamera) {
-        canvasCtx.translate(w, 0);
-        canvasCtx.scale(-1, 1);
-      }
-      canvasCtx.drawImage(results.image, 0, 0, w, h);
-      canvasCtx.restore();
+        canvasCtx.filter = "none";
 
-      canvasCtx.filter = "none";
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          noFaceFrameCounter = 0;
+          faceReticle.style.display = 'none';
 
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        noFaceFrameCounter = 0;
-        faceReticle.style.display = 'none';
+          for (const faceLandmarks of results.multiFaceLandmarks) {
+            const pts = faceLandmarks.landmark.map(lm => ({
+              x: isFrontCamera ? (1 - lm.x) * w : lm.x * w,
+              y: lm.y * h
+            }));
 
-        for (const faceLandmarks of results.multiFaceLandmarks) {
-          // Extract array of all 468 2D landmark pixel points
-          const pts = faceLandmarks.landmark.map(lm => ({
-            x: isFrontCamera ? (1 - lm.x) * w : lm.x * w,
-            y: lm.y * h
-          }));
+            const nose = pts[4];
+            const lEye = pts[159];
+            const rEye = pts[386];
+            const mouth = pts[14];
+            const upperLip = pts[13];
+            const forehead = pts[10];
+            const chin = pts[152];
 
-          const nose = pts[4];
-          const lEye = pts[159];
-          const rEye = pts[386];
-          const mouth = pts[14];
-          const upperLip = pts[13];
-          const forehead = pts[10];
-          const chin = pts[152];
+            const screenLeftEye = lEye.x < rEye.x ? lEye : rEye;
+            const screenRightEye = lEye.x < rEye.x ? rEye : lEye;
 
-          const screenLeftEye = lEye.x < rEye.x ? lEye : rEye;
-          const screenRightEye = lEye.x < rEye.x ? rEye : lEye;
+            const eyeDist = Math.hypot(screenRightEye.x - screenLeftEye.x, screenRightEye.y - screenLeftEye.y);
+            const scale = Math.max(eyeDist / 70, 0.4);
+            const angle = Math.atan2(screenRightEye.y - screenLeftEye.y, screenRightEye.x - screenLeftEye.x);
 
-          const eyeDist = Math.hypot(screenRightEye.x - screenLeftEye.x, screenRightEye.y - screenLeftEye.y);
-          const scale = Math.max(eyeDist / 70, 0.4);
-          const angle = Math.atan2(screenRightEye.y - screenLeftEye.y, screenRightEye.x - screenLeftEye.x);
+            const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
+            if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
+              playSound(FILTER_LIST[currentFilterIndex].sound);
+              lastMouthSoundTime = Date.now();
+            }
 
-          // Trigger mouth open sound effect
-          const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
-          if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
-            playSound(FILTER_LIST[currentFilterIndex].sound);
-            lastMouthSoundTime = Date.now();
+            renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, chin, scale, angle });
           }
+        } else {
+          noFaceFrameCounter++;
+          if (noFaceFrameCounter > 20) {
+            faceReticle.style.display = 'block';
+          }
+        }
 
-          renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, chin, scale, angle });
-        }
-      } else {
-        noFaceFrameCounter++;
-        if (noFaceFrameCounter > 20) {
-          faceReticle.style.display = 'block';
-        }
+        drawWatermark(w, h);
+      } catch (err) {
+        console.error("Render loop error caught safely:", err);
       }
-
-      drawWatermark(w, h);
     }
 
     function renderFilter(idx, f) {
@@ -1025,7 +1030,7 @@
     });
 
     faceMesh.setOptions({
-      maxNumFaces: 2,
+      maxNumFaces: 1,
       refineLandmarks: true,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
