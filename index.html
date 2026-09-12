@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Jesse Funny Face</title>
+
+  <!-- MediaPipe Face Mesh & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+  <style>
+    * { box-sizing: border-box; touch-action: manipulation; }
+    body, html {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background-color: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #app-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    video { display: none; }
+    
+    canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
+    /* Top App Header & Branding Bar */
+    #top-header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 30;
+      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+      padding: 12px 16px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #brand-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #FFD700;
+      font-size: 20px;
+      font-weight: 800;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      letter-spacing: 0.5px;
+    }
+
+    #app-thumbnail {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #FFD700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+      border: 2px solid #FFF;
+    }
+
+    /* Action Controls Bar */
+    #action-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .action-btn {
+      background: rgba(20, 20, 20, 0.75);
+      color: white;
+      border: 1.5px solid rgba(255, 255, 255, 0.4);
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      backdrop-filter: blur(8px);
+      cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+    }
+    .action-btn:active { transform: scale(0.95); }
+
+    /* Recording Button Active Pulsing Effect */
+    #rec-btn.recording {
+      background: rgba(220, 20, 60, 0.9);
+      border-color: #FF0055;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.7); }
+      70% { box-shadow: 0 0 0 12px rgba(255, 0, 85, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
+    }
+
+    /* Active Filter Title Label */
+    #filter-label {
+      position: absolute;
+      bottom: 95px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      background: rgba(0, 0, 0, 0.7);
+      color: #FFF;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* Bottom 30 Filter Carousel */
+    #filter-bar {
+      position: absolute;
+      bottom: 20px; left: 0; right: 0;
+      z-index: 20;
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 10px 16px;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    #filter-bar::-webkit-scrollbar { display: none; }
+    
+    .filter-btn {
+      flex: 0 0 auto;
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: rgba(30, 30, 30, 0.75);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      font-size: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .filter-btn.active {
+      border-color: #FFD700;
+      background: rgba(255, 215, 0, 0.35);
+      transform: scale(1.15);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-container">
+    <video id="webcam" playsinline autoplay muted></video>
+    <canvas id="output_canvas"></canvas>
+
+    <!-- Top App Header -->
+    <div id="top-header">
+      <div id="brand-title">
+        <div id="app-thumbnail">🤪</div>
+        <span>Jesse Funny Face</span>
+      </div>
+      <div id="action-bar">
+        <button class="action-btn" id="photo-btn" onclick="takePhoto()">📸 Photo</button>
+        <button class="action-btn" id="rec-btn" onclick="toggleRecording()">🎥 Record</button>
+        <button class="action-btn" id="sound-btn" onclick="toggleSound()">🔊 Sound ON</button>
+      </div>
+    </div>
+
+    <div id="filter-label">1. Circus Googly</div>
+    <div id="filter-bar"></div>
+  </div>
+
+  <script>
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const filterBar = document.getElementById('filter-bar');
+    const filterLabel = document.getElementById('filter-label');
+
+    let currentFilterIndex = 0;
+    let soundEnabled = true;
+    let lastMouthSoundTime = 0;
+
+    // --- Web Audio Synthesizer (Funny Sound Effects) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+
+      switch(type) {
+        case 'boing':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(650, now + 0.3);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.3);
+          break;
+
+        case 'zap':
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(900, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.2);
+          break;
+
+        case 'quack':
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.linearRampToValueAtTime(240, now + 0.15);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.2);
+          break;
+
+        case 'squeak':
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1100, now);
+          osc.frequency.linearRampToValueAtTime(1700, now + 0.12);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.12);
+          break;
+
+        case 'honk':
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(220, now);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.25);
+          break;
+
+        case 'pop':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(500, now);
+          osc.frequency.exponentialRampToValueAtTime(100, now + 0.08);
+          gain.gain.setValueAtTime(0.6, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.08);
+          break;
+
+        case 'fart':
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(110, now);
+          osc.frequency.linearRampToValueAtTime(60, now + 0.35);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.35);
+          break;
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('sound-btn');
+      btn.innerText = soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF";
+    }
+
+    // --- 30 Funny Face Filters ---
+    const FILTER_LIST = [
+      { id: 0,  icon: "🤪", name: "1. Circus Googly", sound: 'boing' },
+      { id: 1,  icon: "🏴‍☠️", name: "2. Pirate Cap'n", sound: 'zap' },
+      { id: 2,  icon: "🐱", name: "3. Kitty Cat", sound: 'squeak' },
+      { id: 3,  icon: "🐶", name: "4. Happy Doggo", sound: 'boing' },
+      { id: 4,  icon: "🐷", name: "5. Pig Snout", sound: 'fart' },
+      { id: 5,  icon: "🦄", name: "6. Magic Unicorn", sound: 'squeak' },
+      { id: 6,  icon: "👽", name: "7. Alien Cyclops", sound: 'zap' },
+      { id: 7,  icon: "😈", name: "8. Little Devil", sound: 'zap' },
+      { id: 8,  icon: "😇", name: "9. Holy Angel", sound: 'squeak' },
+      { id: 9,  icon: "🕶️", name: "10. Thug Life", sound: 'pop' },
+      { id: 10, icon: "🎩", name: "11. Fancy Gentleman", sound: 'honk' },
+      { id: 11, icon: "🧛", name: "12. Vampire Fangs", sound: 'zap' },
+      { id: 12, icon: "🤖", name: "13. Cyborg Laser", sound: 'zap' },
+      { id: 13, icon: "🧙", name: "14. Grand Wizard", sound: 'boing' },
+      { id: 14, icon: "👑", name: "15. Royal King", sound: 'honk' },
+      { id: 15, icon: "🧟", name: "16. Zombie Craze", sound: 'fart' },
+      { id: 16, icon: "💀", name: "17. Skull Mask", sound: 'zap' },
+      { id: 17, icon: "🦆", name: "18. Quack Duck", sound: 'quack' },
+      { id: 18, icon: "🤩", name: "19. Anime Star", sound: 'pop' },
+      { id: 19, icon: "🔥", name: "20. Fire Eyes", sound: 'zap' },
+      { id: 20, icon: "😭", name: "21. Drama Queen", sound: 'boing' },
+      { id: 21, icon: "👨‍🍳", name: "22. Master Chef", sound: 'pop' },
+      { id: 22, icon: "🥷", name: "23. Shadow Ninja", sound: 'zap' },
+      { id: 23, icon: "🎅", name: "24. Santa Claus", sound: 'honk' },
+      { id: 24, icon: "🐰", name: "25. Bunny Hop", sound: 'squeak' },
+      { id: 25, icon: "🦹", name: "26. Hero Mask", sound: 'zap' },
+      { id: 26, icon: "🐸", name: "27. Froggy", sound: 'boing' },
+      { id: 27, icon: "🥳", name: "28. Disco Party", sound: 'pop' },
+      { id: 28, icon: "🤡", name: "29. Scary Clown", sound: 'honk' },
+      { id: 29, icon: "🐝", name: "30. Bumblebee", sound: 'squeak' }
+    ];
+
+    FILTER_LIST.forEach((f, idx) => {
+      const btn = document.createElement('div');
+      btn.className = `filter-btn ${idx === 0 ? 'active' : ''}`;
+      btn.innerHTML = f.icon;
+      btn.onclick = () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilterIndex = idx;
+        filterLabel.innerText = f.name;
+        playSound(f.sound);
+      };
+      filterBar.appendChild(btn);
+    });
+
+    function syncCanvasSize() {
+      canvasElement.width = window.innerWidth;
+      canvasElement.height = window.innerHeight;
+    }
+    window.addEventListener('resize', syncCanvasSize);
+    syncCanvasSize();
+
+    // --- Photo Snapshot & Download ---
+    function takePhoto() {
+      playSound('pop');
+      const dataUrl = canvasElement.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `jesse_funny_face_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    }
+
+    // --- Video Recording ---
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    function toggleRecording() {
+      const recBtn = document.getElementById('rec-btn');
+
+      if (!isRecording) {
+        recordedChunks = [];
+        const canvasStream = canvasElement.captureStream(30);
+        let mimeType = 'video/webm';
+        if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+
+        mediaRecorder = new MediaRecorder(canvasStream, { mimeType });
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `jesse_funny_video_${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 100);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recBtn.classList.add('recording');
+        recBtn.innerText = "🛑 Stop";
+        playSound('boing');
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        recBtn.classList.remove('recording');
+        recBtn.innerText = "🎥 Record";
+        playSound('pop');
+      }
+    }
+
+    function drawEmoji(emoji, x, y, size, angle = 0) {
+      canvasCtx.save();
+      canvasCtx.translate(x, y);
+      canvasCtx.rotate(angle);
+      canvasCtx.font = `${size}px sans-serif`;
+      canvasCtx.textAlign = 'center';
+      canvasCtx.textBaseline = 'middle';
+      canvasCtx.fillText(emoji, 0, 0);
+      canvasCtx.restore();
+    }
+
+    // --- Camera Render Loop ---
+    function onResults(results) {
+      const w = canvasElement.width;
+      const h = canvasElement.height;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, w, h);
+
+      canvasCtx.translate(w, 0);
+      canvasCtx.scale(-1, 1);
+      canvasCtx.drawImage(results.image, 0, 0, w, h);
+      canvasCtx.restore();
+
+      if (results.multiFaceLandmarks) {
+        for (const landmarks of results.multiFaceLandmarks) {
+          const getPt = (idx) => ({ x: (1 - landmarks[idx].x) * w, y: landmarks[idx].y * h });
+
+          const nose = getPt(4);
+          const lEye = getPt(159);
+          const rEye = getPt(386);
+          const mouth = getPt(14);
+          const upperLip = getPt(13);
+          const forehead = getPt(10);
+          const chin = getPt(152);
+          const lCheek = getPt(234);
+          const rCheek = getPt(454);
+          const underNose = getPt(164);
+
+          const eyeDist = Math.hypot(rEye.x - lEye.x, rEye.y - lEye.y);
+          const scale = Math.max(eyeDist / 70, 0.4);
+          const angle = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
+
+          // Mouth open triggers funny noise
+          const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
+          if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
+            playSound(FILTER_LIST[currentFilterIndex].sound);
+            lastMouthSoundTime = Date.now();
+          }
+
+          renderFilter(currentFilterIndex, { nose, lEye, rEye, mouth, forehead, chin, lCheek, rCheek, underNose, scale, angle });
+        }
+      }
+    }
+
+    function renderFilter(idx, f) {
+      const s = f.scale;
+      const a = f.angle;
+
+      switch(idx) {
+        case 0: drawGooglyEyes(f.lEye, f.rEye, 28 * s); drawEmoji("🔴", f.nose.x, f.nose.y, 45 * s, a); drawEmoji("🥸", f.underNose.x, f.underNose.y + 10 * s, 90 * s, a); break;
+        case 1: drawEmoji("🏴‍☠️", f.forehead.x, f.forehead.y - 30 * s, 100 * s, a); drawEmoji("👁️‍🗨️", f.rEye.x, f.rEye.y, 45 * s, a); drawEmoji("🧔", f.chin.x, f.chin.y, 110 * s, a); break;
+        case 2: drawEmoji("🐱", f.forehead.x, f.forehead.y - 40 * s, 110 * s, a); drawEmoji("🌸", f.nose.x, f.nose.y, 35 * s, a); break;
+        case 3: drawEmoji("🐶", f.forehead.x, f.forehead.y - 30 * s, 120 * s, a); drawEmoji("👅", f.mouth.x, f.mouth.y + 20 * s, 45 * s, a); break;
+        case 4: drawEmoji("🐽", f.nose.x, f.nose.y, 75 * s, a); drawEmoji("🐷", f.forehead.x, f.forehead.y - 50 * s, 100 * s, a); break;
+        case 5: drawEmoji("🦄", f.forehead.x, f.forehead.y - 50 * s, 130 * s, a); break;
+        case 6: drawEmoji("👁️", f.forehead.x, f.forehead.y, 70 * s, a); drawEmoji("📡", f.forehead.x, f.forehead.y - 60 * s, 80 * s, a); break;
+        case 7: drawEmoji("😈", f.forehead.x, f.forehead.y - 30 * s, 110 * s, a); break;
+        case 8: drawEmoji("😇", f.forehead.x, f.forehead.y - 60 * s, 120 * s, a); break;
+        case 9: drawEmoji("🕶️", (f.lEye.x + f.rEye.x)/2, (f.lEye.y + f.rEye.y)/2, 95 * s, a); drawEmoji("🚬", f.mouth.x + 20 * s, f.mouth.y + 10 * s, 45 * s, a); break;
+        case 10: drawEmoji("🎩", f.forehead.x, f.forehead.y - 60 * s, 110 * s, a); drawEmoji("🧐", f.rEye.x, f.rEye.y, 50 * s, a); break;
+        case 11: drawEmoji("🧛", f.forehead.x, f.forehead.y - 40 * s, 100 * s, a); drawEmoji("🩸", f.mouth.x, f.mouth.y + 15 * s, 40 * s, a); break;
+        case 12: drawEmoji("🤖", f.forehead.x, f.forehead.y - 50 * s, 90 * s, a); break;
+        case 13: drawEmoji("🧙", f.forehead.x, f.forehead.y - 50 * s, 120 * s, a); break;
+        case 14: drawEmoji("👑", f.forehead.x, f.forehead.y - 50 * s, 110 * s, a); break;
+        case 15: drawEmoji("🧟", f.forehead.x, f.forehead.y - 30 * s, 110 * s, a); break;
+        case 16: drawEmoji("💀", (f.lEye.x + f.rEye.x)/2, f.nose.y, 140 * s, a); break;
+        case 17: drawEmoji("🦆", f.forehead.x, f.forehead.y - 40 * s, 100 * s, a); drawEmoji("👄", f.mouth.x, f.mouth.y, 65 * s, a); break;
+        case 18: drawEmoji("🤩", (f.lEye.x + f.rEye.x)/2, (f.lEye.y + f.rEye.y)/2, 110 * s, a); break;
+        case 19: drawEmoji("🔥", f.lEye.x, f.lEye.y, 50 * s, a); drawEmoji("🔥", f.rEye.x, f.rEye.y, 50 * s, a); break;
+        case 20: drawEmoji("😭", (f.lEye.x + f.rEye.x)/2, f.nose.y, 130 * s, a); break;
+        case 21: drawEmoji("👨‍🍳", f.forehead.x, f.forehead.y - 50 * s, 120 * s, a); break;
+        case 22: drawEmoji("🥷", f.forehead.x, f.forehead.y - 20 * s, 130 * s, a); break;
+        case 23: drawEmoji("🎅", f.forehead.x, f.forehead.y - 40 * s, 120 * s, a); break;
+        case 24: drawEmoji("🐰", f.forehead.x, f.forehead.y - 50 * s, 130 * s, a); break;
+        case 25: drawEmoji("🦹", (f.lEye.x + f.rEye.x)/2, f.lEye.y - 10 * s, 120 * s, a); break;
+        case 26: drawEmoji("🐸", f.forehead.x, f.forehead.y - 40 * s, 120 * s, a); break;
+        case 27: drawEmoji("🥳", f.forehead.x, f.forehead.y - 30 * s, 110 * s, a); break;
+        case 28: drawEmoji("🤡", (f.lEye.x + f.rEye.x)/2, f.nose.y, 140 * s, a); break;
+        case 29: drawEmoji("🐝", f.forehead.x, f.forehead.y - 50 * s, 100 * s, a); break;
+      }
+    }
+
+    function drawGooglyEyes(lEye, rEye, radius) {
+      const t = Date.now() * 0.012;
+      const pupilOffsetX = Math.sin(t) * (radius * 0.25);
+      const pupilOffsetY = Math.cos(t * 1.3) * (radius * 0.25);
+
+      [lEye, rEye].forEach(eye => {
+        canvasCtx.beginPath();
+        canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = '#FFFFFF'; canvasCtx.fill();
+        canvasCtx.lineWidth = 3; canvasCtx.strokeStyle = '#000000'; canvasCtx.stroke();
+
+        const px = eye.x + pupilOffsetX, py = eye.y + pupilOffsetY;
+        canvasCtx.beginPath();
+        canvasCtx.arc(px, py, radius * 0.4, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = '#000000'; canvasCtx.fill();
+
+        canvasCtx.beginPath();
+        canvasCtx.arc(px - radius * 0.1, py - radius * 0.1, radius * 0.1, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = '#FFFFFF'; canvasCtx.fill();
+      });
+    }
+
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 2,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await faceMesh.send({ image: videoElement });
+      },
+      width: 1280,
+      height: 720,
+      facingMode: 'user'
+    });
+
+    camera.start();
+  </script>
+</body>
+</html>
