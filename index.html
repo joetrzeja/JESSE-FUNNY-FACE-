@@ -32,14 +32,14 @@
       background: #000;
     }
     
-    /* Fixed: Video element rendered fullscreen behind canvas so Mobile Safari/Chrome keeps GPU engine active */
+    /* Video element sits in background for WebKit camera streaming */
     video {
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
       object-fit: cover;
       z-index: 1;
-      opacity: 0.001; /* Keeps WebKit hardware decoder running */
+      opacity: 0.001;
       pointer-events: none;
     }
     
@@ -77,7 +77,7 @@
       display: none;
     }
 
-    /* Top App Header & Controls */
+    /* Top App Header Controls */
     #top-header {
       position: absolute;
       top: 0; left: 0; right: 0;
@@ -169,7 +169,7 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Elevated Bottom Controls Container */
+    /* Bottom UI Controls */
     #bottom-controls {
       position: absolute;
       bottom: calc(20px + env(safe-area-inset-bottom, 16px));
@@ -285,7 +285,7 @@
       </div>
     </div>
 
-    <!-- Elevated Bottom Controls -->
+    <!-- Bottom Controls -->
     <div id="bottom-controls">
       <div id="filter-label">1. Realistic Aged Face</div>
       <div id="category-tabs">
@@ -354,16 +354,6 @@
           osc.frequency.setValueAtTime(900, now);
           osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
           gain.gain.setValueAtTime(0.4, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.2);
-          break;
-
-        case 'quack':
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(320, now);
-          osc.frequency.linearRampToValueAtTime(240, now + 0.15);
-          gain.gain.setValueAtTime(0.5, now);
           gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
           osc.connect(gain); gain.connect(audioCtx.destination);
           osc.start(now); osc.stop(now + 0.2);
@@ -446,38 +436,38 @@
       { id: 7,  cat: 'trending',  icon: "😭", name: "8. Realistic Tear Stream", sound: 'boing', type: 'vector_crying' },
       { id: 8,  cat: 'vfx',       icon: "🖼️", name: "9. Custom Mask Upload", sound: 'pop', type: 'custom_upload' },
       { id: 9,  cat: 'vfx',       icon: "🤪", name: "10. Circus Googly Eyes", sound: 'boing', type: 'custom_googly' },
-      { id: 10, cat: 'vfx',       icon: "🕶️", name: "11. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️" },
-      { id: 11, cat: 'vfx',       icon: "🤓", name: "12. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓" },
-      { id: 12, cat: 'vfx',       icon: "🤡", name: "13. Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡" },
-      { id: 13, cat: 'vfx',       icon: "👨‍🍳", name: "14. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳" },
-      { id: 14, cat: 'vfx',       icon: "🥷", name: "15. Shadow Ninja Mask", sound: 'zap', type: 'emoji', emoji: "🥷" },
-      { id: 15, cat: 'vfx',       icon: "🎅", name: "16. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅" },
-      { id: 16, cat: 'vfx',       icon: "👑", name: "17. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑" },
-      { id: 17, cat: 'vfx',       icon: "🧙", name: "18. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙" },
-      { id: 18, cat: 'vfx',       icon: "🏴‍☠️", name: "19. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️" },
-      { id: 19, cat: 'vfx',       icon: "🤖", name: "20. Cyborg Metallic Lens", sound: 'zap', type: 'emoji', emoji: "🤖" },
-      { id: 20, cat: 'vfx',       icon: "👽", name: "21. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽" },
-      { id: 21, cat: 'vfx',       icon: "😈", name: "22. Little Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈" },
-      { id: 22, cat: 'vfx',       icon: "😇", name: "23. Holy Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇" },
-      { id: 23, cat: 'vfx',       icon: "🤩", name: "24. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩" },
-      { id: 24, cat: 'vfx',       icon: "🔥", name: "25. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥" },
-      { id: 25, cat: 'vfx',       icon: "🥳", name: "26. Party Celebration", sound: 'pop', type: 'emoji', emoji: "🥳" },
-      { id: 26, cat: 'vfx',       icon: "🧐", name: "27. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐" },
-      { id: 27, cat: 'vfx',       icon: "🎭", name: "28. Venetian Masquerade", sound: 'honk', type: 'emoji', emoji: "🎭" }
+      { id: 10, cat: 'vfx',       icon: "🕶️", name: "11. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️", anchor: 'eyes' },
+      { id: 11, cat: 'vfx',       icon: "🤓", name: "12. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓", anchor: 'eyes' },
+      { id: 12, cat: 'vfx',       icon: "🤡", name: "13. Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡", anchor: 'face' },
+      { id: 13, cat: 'vfx',       icon: "👨‍🍳", name: "14. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳", anchor: 'head' },
+      { id: 14, cat: 'vfx',       icon: "🥷", name: "15. Shadow Ninja Mask", sound: 'zap', type: 'emoji', emoji: "🥷", anchor: 'face' },
+      { id: 15, cat: 'vfx',       icon: "🎅", name: "16. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅", anchor: 'head' },
+      { id: 16, cat: 'vfx',       icon: "👑", name: "17. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑", anchor: 'head' },
+      { id: 17, cat: 'vfx',       icon: "🧙", name: "18. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙", anchor: 'head' },
+      { id: 18, cat: 'vfx',       icon: "🏴‍☠️", name: "19. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️", anchor: 'head' },
+      { id: 19, cat: 'vfx',       icon: "🤖", name: "20. Cyborg Lens", sound: 'zap', type: 'emoji', emoji: "🤖", anchor: 'face' },
+      { id: 20, cat: 'vfx',       icon: "👽", name: "21. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽", anchor: 'face' },
+      { id: 21, cat: 'vfx',       icon: "😈", name: "22. Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈", anchor: 'head' },
+      { id: 22, cat: 'vfx',       icon: "😇", name: "23. Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇", anchor: 'head' },
+      { id: 23, cat: 'vfx',       icon: "🤩", name: "24. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩", anchor: 'eyes' },
+      { id: 24, cat: 'vfx',       icon: "🔥", name: "25. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥", anchor: 'eyes' },
+      { id: 25, cat: 'vfx',       icon: "🥳", name: "26. Party Celebration", sound: 'pop', type: 'emoji', emoji: "🥳", anchor: 'head' },
+      { id: 26, cat: 'vfx',       icon: "🧐", name: "27. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐", anchor: 'eyes' },
+      { id: 27, cat: 'vfx',       icon: "🎭", name: "28. Masquerade Mask", sound: 'honk', type: 'emoji', emoji: "🎭", anchor: 'eyes' }
     ];
 
     function renderFilterButtons() {
       filterBar.innerHTML = '';
-      FILTER_LIST.forEach((f, idx) => {
+      FILTER_LIST.forEach((f) => {
         if (activeCategory !== 'all' && f.cat !== activeCategory) return;
 
         const btn = document.createElement('div');
-        btn.className = `filter-btn ${idx === currentFilterIndex ? 'active' : ''}`;
+        btn.className = `filter-btn ${f.id === currentFilterIndex ? 'active' : ''}`;
         btn.innerHTML = f.icon;
         btn.onclick = () => {
           document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          currentFilterIndex = idx;
+          currentFilterIndex = f.id; // Fixed: Sets exact filter ID
           filterLabel.innerText = f.name;
           playSound(f.sound);
           if (f.type === 'custom_upload' && !customMaskImage) {
@@ -668,8 +658,8 @@
     function renderAgedFace(pts, scale) {
       canvasCtx.save();
       canvasCtx.globalCompositeOperation = 'multiply';
-      canvasCtx.strokeStyle = 'rgba(74, 46, 27, 0.75)';
-      canvasCtx.lineWidth = Math.max(3 * scale, 2);
+      canvasCtx.strokeStyle = 'rgba(74, 46, 27, 0.8)';
+      canvasCtx.lineWidth = Math.max(3.5 * scale, 2);
       canvasCtx.lineCap = 'round';
 
       drawLandmarkPath(pts, [109, 10, 338]); canvasCtx.stroke();
@@ -681,8 +671,8 @@
       drawLandmarkPath(pts, [425, 426, 322, 391, 291]); canvasCtx.stroke();
 
       canvasCtx.globalCompositeOperation = 'source-over';
-      canvasCtx.strokeStyle = 'rgba(230, 230, 230, 0.9)';
-      canvasCtx.lineWidth = 14 * scale;
+      canvasCtx.strokeStyle = 'rgba(235, 235, 235, 0.95)';
+      canvasCtx.lineWidth = 15 * scale;
       drawLandmarkPath(pts, L_EYEBROW); canvasCtx.stroke();
       drawLandmarkPath(pts, R_EYEBROW); canvasCtx.stroke();
 
@@ -730,8 +720,8 @@
         canvasCtx.lineWidth = 4 * scale;
 
         canvasCtx.beginPath();
-        canvasCtx.ellipse(pts[159].x, pts[159].y, 36 * scale, 26 * scale, 0, 0, 2 * Math.PI);
-        canvasCtx.ellipse(pts[386].x, pts[386].y, 36 * scale, 26 * scale, 0, 0, 2 * Math.PI);
+        canvasCtx.ellipse(pts[159].x, pts[159].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
+        canvasCtx.ellipse(pts[386].x, pts[386].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
         canvasCtx.fill();
         canvasCtx.stroke();
       }
@@ -745,7 +735,7 @@
       
       const lFang = pts[37];
       const rFang = pts[267];
-      const fangLen = 26 * scale;
+      const fangLen = 28 * scale;
 
       canvasCtx.fillStyle = '#FFFFFF';
       canvasCtx.strokeStyle = '#CCCCCC';
@@ -811,12 +801,23 @@
       canvasCtx.restore();
     }
 
-    function applyPixelWarp(type, f) {
+    // Fixed Real-Time Pixel Warp Engine
+    function applyPixelWarp(type, f, rawPts) {
       const s = f.scale;
       const vW = videoElement.videoWidth || 1280;
       const vH = videoElement.videoHeight || 720;
+      
       if (type === 'warp_mouth') {
-        const radius = 60 * s;
+        const mouthCenter = rawPts[14];
+        if (!mouthCenter) return;
+        const radius = 65 * s;
+
+        // Video source cropping
+        const cropW = 140;
+        const cropH = 90;
+        const srcX = Math.max(0, mouthCenter.x * vW - cropW / 2);
+        const srcY = Math.max(0, mouthCenter.y * vH - cropH / 2);
+
         canvasCtx.save();
         canvasCtx.beginPath();
         canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
@@ -824,13 +825,24 @@
         
         canvasCtx.drawImage(
           videoElement,
-          0, 0, vW, vH,
-          f.mouth.x - radius * 1.5, f.mouth.y - radius * 1.5, radius * 3, radius * 3
+          srcX, srcY, cropW, cropH,
+          f.mouth.x - radius * 1.3, f.mouth.y - radius * 1.1, radius * 2.6, radius * 2.2
         );
         canvasCtx.restore();
       } else if (type === 'warp_eyes') {
-        const radius = 40 * s;
-        [f.lEye, f.rEye].forEach(eye => {
+        const radius = 45 * s;
+        const eyeLandmarks = [rawPts[159], rawPts[386]];
+        const screenEyes = [f.lEye, f.rEye];
+
+        screenEyes.forEach((eye, i) => {
+          const rawEye = eyeLandmarks[i];
+          if (!rawEye) return;
+
+          const cropW = 100;
+          const cropH = 80;
+          const srcX = Math.max(0, rawEye.x * vW - cropW / 2);
+          const srcY = Math.max(0, rawEye.y * vH - cropH / 2);
+
           canvasCtx.save();
           canvasCtx.beginPath();
           canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
@@ -838,8 +850,8 @@
 
           canvasCtx.drawImage(
             videoElement,
-            0, 0, vW, vH,
-            eye.x - radius * 1.4, eye.y - radius * 1.4, radius * 2.8, radius * 2.8
+            srcX, srcY, cropW, cropH,
+            eye.x - radius * 1.4, eye.y - radius * 1.2, radius * 2.8, radius * 2.4
           );
           canvasCtx.restore();
         });
@@ -877,7 +889,7 @@
       canvasCtx.restore();
     }
 
-    // --- Core Camera & Rendering Pipeline ---
+    // --- MediaPipe Callback Engine ---
     function onResults(results) {
       const w = canvasElement.width;
       const h = canvasElement.height;
@@ -885,7 +897,7 @@
       const imgW = (results.image && results.image.width) ? results.image.width : (videoElement.videoWidth || 1280);
       const imgH = (results.image && results.image.height) ? results.image.height : (videoElement.videoHeight || 720);
 
-      // Aspect Cover math prevents squished video and keeps face centered
+      // Aspect Cover coordinate math
       const aspectImg = imgW / imgH;
       const aspectCanvas = w / h;
       let drawW, drawH, dx, dy;
@@ -924,12 +936,13 @@
         faceReticle.style.display = 'none';
 
         for (const faceLandmarks of results.multiFaceLandmarks) {
-          const pts = faceLandmarks.landmark.map(lm => {
-            const rawX = isFrontCamera ? (1 - lm.x) : lm.x;
-            return {
-              x: dx + rawX * drawW,
-              y: dy + lm.y * drawH
-            };
+          const rawPts = faceLandmarks.landmark;
+
+          // Compute exact screen coordinates
+          const pts = rawPts.map(lm => {
+            const screenX = isFrontCamera ? (w - (dx + lm.x * drawW)) : (dx + lm.x * drawW);
+            const screenY = dy + lm.y * drawH;
+            return { x: screenX, y: screenY };
           });
 
           const nose = pts[4];
@@ -938,7 +951,6 @@
           const mouth = pts[14];
           const upperLip = pts[13];
           const forehead = pts[10];
-          const chin = pts[152];
 
           const screenLeftEye = lEye.x < rEye.x ? lEye : rEye;
           const screenRightEye = lEye.x < rEye.x ? rEye : lEye;
@@ -953,7 +965,7 @@
             lastMouthSoundTime = Date.now();
           }
 
-          renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, chin, scale, angle });
+          renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, scale, angle }, rawPts);
         }
       } else {
         noFaceFrameCounter++;
@@ -965,8 +977,9 @@
       drawWatermark(w, h);
     }
 
-    function renderFilter(idx, f) {
+    function renderFilter(idx, f, rawPts) {
       const filter = FILTER_LIST[idx];
+      if (!filter) return;
       const s = f.scale;
       const a = f.angle;
 
@@ -979,7 +992,7 @@
         case 'vector_crying': renderCryingTears(f.pts, s); break;
         case 'warp_mouth':
         case 'warp_eyes':
-          applyPixelWarp(filter.type, f);
+          applyPixelWarp(filter.type, f, rawPts);
           break;
         case 'custom_upload':
           if (customMaskImage) drawGraphicMask(customMaskImage, f.nose.x, f.nose.y, 260 * s, 260 * s, a);
@@ -989,7 +1002,15 @@
           drawEmoji("🔴", f.nose.x, f.nose.y, 42 * s, a);
           break;
         case 'emoji':
-          drawEmoji(filter.emoji, (f.lEye.x + f.rEye.x)/2, f.nose.y, 130 * s, a);
+          let posX = f.nose.x, posY = f.nose.y;
+          if (filter.anchor === 'head') {
+            posX = f.forehead.x;
+            posY = f.forehead.y - 35 * s;
+          } else if (filter.anchor === 'eyes') {
+            posX = (f.lEye.x + f.rEye.x) / 2;
+            posY = (f.lEye.y + f.rEye.y) / 2;
+          }
+          drawEmoji(filter.emoji, posX, posY, 135 * s, a);
           break;
       }
     }
@@ -1016,7 +1037,7 @@
       });
     }
 
-    // MediaPipe FaceMesh Setup
+    // Initialize MediaPipe FaceMesh
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -1030,7 +1051,7 @@
 
     faceMesh.onResults(onResults);
 
-    // Native Camera Engine (Eliminates MediaPipe Camera helper bugs)
+    // Camera Stream Initialization
     async function startCamera() {
       if (videoElement.srcObject) {
         videoElement.srcObject.getTracks().forEach(track => track.stop());
@@ -1054,20 +1075,16 @@
       }
     }
 
-    // Frame Loop (Feeds camera frames to FaceMesh and renders video constantly)
+    // Clean Processing Loop
     async function processFrame() {
       if (videoElement.readyState >= 2 && !isProcessingFrame) {
         isProcessingFrame = true;
         try {
           await faceMesh.send({ image: videoElement });
         } catch (e) {
-          // Fallback draw camera if faceMesh is still loading
-          onResults({ image: videoElement, multiFaceLandmarks: [] });
+          console.error("Tracking frame skipped", e);
         }
         isProcessingFrame = false;
-      } else if (videoElement.readyState >= 2) {
-        // Render fallback camera stream if FaceMesh is busy
-        onResults({ image: videoElement, multiFaceLandmarks: [] });
       }
       requestAnimationFrame(processFrame);
     }
