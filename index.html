@@ -12,8 +12,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#000000">
 
-  <!-- MediaPipe Face Mesh & Camera Utils -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <!-- MediaPipe Face Mesh -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
   <style>
@@ -30,14 +29,17 @@
       width: 100vw;
       height: 100dvh;
       overflow: hidden;
+      background: #000;
     }
     
-    /* Fixed: Video kept active in DOM for iOS Safari / Mobile Chrome */
+    /* Fixed: Video element rendered fullscreen behind canvas so Mobile Safari/Chrome keeps GPU engine active */
     video {
       position: absolute;
       top: 0; left: 0;
-      width: 1px; height: 1px;
-      opacity: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      opacity: 0.001; /* Keeps WebKit hardware decoder running */
       pointer-events: none;
     }
     
@@ -46,9 +48,10 @@
       top: 0; left: 0;
       width: 100%; height: 100%;
       object-fit: cover;
+      z-index: 2;
     }
 
-    /* Shutter Flash Animation */
+    /* Flash Animation */
     #flash-overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -166,10 +169,10 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Elevated Bottom Controller Container */
+    /* Elevated Bottom Controls Container */
     #bottom-controls {
       position: absolute;
-      bottom: calc(24px + env(safe-area-inset-bottom, 20px));
+      bottom: calc(20px + env(safe-area-inset-bottom, 16px));
       left: 0; right: 0;
       z-index: 30;
       display: flex;
@@ -183,7 +186,6 @@
       pointer-events: auto;
     }
 
-    /* Active Filter Label */
     #filter-label {
       background: rgba(0, 0, 0, 0.85);
       color: #FFF;
@@ -197,7 +199,6 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
-    /* Category Navigation Tabs */
     #category-tabs {
       display: flex;
       gap: 4px;
@@ -222,7 +223,6 @@
       color: #000;
     }
 
-    /* Filter Carousel */
     #filter-bar {
       width: 100%;
       display: flex;
@@ -311,10 +311,10 @@
     let soundEnabled = true;
     let lastMouthSoundTime = 0;
     let isFrontCamera = true;
-    let cameraInstance = null;
     let noFaceFrameCounter = 0;
     let customMaskImage = null;
     let activeCategory = 'all';
+    let isProcessingFrame = false;
 
     const MOOD_PRESETS = [
       { name: "Normal", filter: "none" },
@@ -521,13 +521,10 @@
       }
     }
 
-    function switchCamera() {
+    async function switchCamera() {
       isFrontCamera = !isFrontCamera;
       playSound('pop');
-      if (cameraInstance) {
-        cameraInstance.stop();
-        startCamera();
-      }
+      await startCamera();
     }
 
     function startCountdown(seconds) {
@@ -816,6 +813,8 @@
 
     function applyPixelWarp(type, f) {
       const s = f.scale;
+      const vW = videoElement.videoWidth || 1280;
+      const vH = videoElement.videoHeight || 720;
       if (type === 'warp_mouth') {
         const radius = 60 * s;
         canvasCtx.save();
@@ -825,7 +824,7 @@
         
         canvasCtx.drawImage(
           videoElement,
-          0, 0, videoElement.videoWidth || 1280, videoElement.videoHeight || 720,
+          0, 0, vW, vH,
           f.mouth.x - radius * 1.5, f.mouth.y - radius * 1.5, radius * 3, radius * 3
         );
         canvasCtx.restore();
@@ -839,7 +838,7 @@
 
           canvasCtx.drawImage(
             videoElement,
-            0, 0, videoElement.videoWidth || 1280, videoElement.videoHeight || 720,
+            0, 0, vW, vH,
             eye.x - radius * 1.4, eye.y - radius * 1.4, radius * 2.8, radius * 2.8
           );
           canvasCtx.restore();
@@ -874,100 +873,96 @@
       canvasCtx.textAlign = "right";
       canvasCtx.shadowColor = "rgba(0, 0, 0, 0.8)";
       canvasCtx.shadowBlur = 4;
-      canvasCtx.fillText("🤪 Jesse Funny Face", w - 16, h - 170);
+      canvasCtx.fillText("🤪 Jesse Funny Face", w - 16, h - 160);
       canvasCtx.restore();
     }
 
-    // --- MediaPipe Engine & Aspect Cover Calculation ---
+    // --- Core Camera & Rendering Pipeline ---
     function onResults(results) {
-      try {
-        const w = canvasElement.width;
-        const h = canvasElement.height;
+      const w = canvasElement.width;
+      const h = canvasElement.height;
 
-        const imgW = results.image.width || 1280;
-        const imgH = results.image.height || 720;
+      const imgW = (results.image && results.image.width) ? results.image.width : (videoElement.videoWidth || 1280);
+      const imgH = (results.image && results.image.height) ? results.image.height : (videoElement.videoHeight || 720);
 
-        // Calculate aspect-fill / cover coordinates (prevents black screen and squished faces)
-        const aspectImg = imgW / imgH;
-        const aspectCanvas = w / h;
-        let drawW, drawH, dx, dy;
+      // Aspect Cover math prevents squished video and keeps face centered
+      const aspectImg = imgW / imgH;
+      const aspectCanvas = w / h;
+      let drawW, drawH, dx, dy;
 
-        if (aspectCanvas > aspectImg) {
-          drawW = w;
-          drawH = w / aspectImg;
-          dx = 0;
-          dy = (h - drawH) / 2;
-        } else {
-          drawH = h;
-          drawW = h * aspectImg;
-          dx = (w - drawW) / 2;
-          dy = 0;
-        }
-
-        canvasCtx.save();
-        canvasCtx.clearRect(0, 0, w, h);
-        canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
-
-        // Render video stream centered
-        if (isFrontCamera) {
-          canvasCtx.translate(w, 0);
-          canvasCtx.scale(-1, 1);
-          canvasCtx.drawImage(results.image, -dx, dy, drawW, drawH);
-        } else {
-          canvasCtx.drawImage(results.image, dx, dy, drawW, drawH);
-        }
-        canvasCtx.restore();
-
-        canvasCtx.filter = "none";
-
-        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-          noFaceFrameCounter = 0;
-          faceReticle.style.display = 'none';
-
-          for (const faceLandmarks of results.multiFaceLandmarks) {
-            // Precise Landmark Mapping using aspect-cover math
-            const pts = faceLandmarks.landmark.map(lm => {
-              const rawX = isFrontCamera ? (1 - lm.x) : lm.x;
-              return {
-                x: dx + rawX * drawW,
-                y: dy + lm.y * drawH
-              };
-            });
-
-            const nose = pts[4];
-            const lEye = pts[159];
-            const rEye = pts[386];
-            const mouth = pts[14];
-            const upperLip = pts[13];
-            const forehead = pts[10];
-            const chin = pts[152];
-
-            const screenLeftEye = lEye.x < rEye.x ? lEye : rEye;
-            const screenRightEye = lEye.x < rEye.x ? rEye : lEye;
-
-            const eyeDist = Math.hypot(screenRightEye.x - screenLeftEye.x, screenRightEye.y - screenLeftEye.y);
-            const scale = Math.max(eyeDist / 70, 0.4);
-            const angle = Math.atan2(screenRightEye.y - screenLeftEye.y, screenRightEye.x - screenLeftEye.x);
-
-            const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
-            if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
-              playSound(FILTER_LIST[currentFilterIndex].sound);
-              lastMouthSoundTime = Date.now();
-            }
-
-            renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, chin, scale, angle });
-          }
-        } else {
-          noFaceFrameCounter++;
-          if (noFaceFrameCounter > 20) {
-            faceReticle.style.display = 'block';
-          }
-        }
-
-        drawWatermark(w, h);
-      } catch (err) {
-        console.error("Render error safely handled:", err);
+      if (aspectCanvas > aspectImg) {
+        drawW = w;
+        drawH = w / aspectImg;
+        dx = 0;
+        dy = (h - drawH) / 2;
+      } else {
+        drawH = h;
+        drawW = h * aspectImg;
+        dx = (w - drawW) / 2;
+        dy = 0;
       }
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, w, h);
+      canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
+
+      const frameSource = (results.image && results.image.width > 0) ? results.image : videoElement;
+
+      if (isFrontCamera) {
+        canvasCtx.translate(w, 0);
+        canvasCtx.scale(-1, 1);
+        canvasCtx.drawImage(frameSource, -dx, dy, drawW, drawH);
+      } else {
+        canvasCtx.drawImage(frameSource, dx, dy, drawW, drawH);
+      }
+      canvasCtx.restore();
+
+      canvasCtx.filter = "none";
+
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        noFaceFrameCounter = 0;
+        faceReticle.style.display = 'none';
+
+        for (const faceLandmarks of results.multiFaceLandmarks) {
+          const pts = faceLandmarks.landmark.map(lm => {
+            const rawX = isFrontCamera ? (1 - lm.x) : lm.x;
+            return {
+              x: dx + rawX * drawW,
+              y: dy + lm.y * drawH
+            };
+          });
+
+          const nose = pts[4];
+          const lEye = pts[159];
+          const rEye = pts[386];
+          const mouth = pts[14];
+          const upperLip = pts[13];
+          const forehead = pts[10];
+          const chin = pts[152];
+
+          const screenLeftEye = lEye.x < rEye.x ? lEye : rEye;
+          const screenRightEye = lEye.x < rEye.x ? rEye : lEye;
+
+          const eyeDist = Math.hypot(screenRightEye.x - screenLeftEye.x, screenRightEye.y - screenLeftEye.y);
+          const scale = Math.max(eyeDist / 70, 0.4);
+          const angle = Math.atan2(screenRightEye.y - screenLeftEye.y, screenRightEye.x - screenLeftEye.x);
+
+          const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
+          if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
+            playSound(FILTER_LIST[currentFilterIndex].sound);
+            lastMouthSoundTime = Date.now();
+          }
+
+          renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, chin, scale, angle });
+        }
+      } else {
+        noFaceFrameCounter++;
+        if (noFaceFrameCounter > 20) {
+          faceReticle.style.display = 'block';
+        }
+      }
+
+      drawWatermark(w, h);
     }
 
     function renderFilter(idx, f) {
@@ -1021,6 +1016,7 @@
       });
     }
 
+    // MediaPipe FaceMesh Setup
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -1034,16 +1030,46 @@
 
     faceMesh.onResults(onResults);
 
-    function startCamera() {
-      cameraInstance = new Camera(videoElement, {
-        onFrame: async () => {
+    // Native Camera Engine (Eliminates MediaPipe Camera helper bugs)
+    async function startCamera() {
+      if (videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: isFrontCamera ? 'user' : 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+
+        videoElement.srcObject = stream;
+        await videoElement.play();
+        requestAnimationFrame(processFrame);
+      } catch (err) {
+        alert("Camera permission denied or camera unavailable: " + err.message);
+      }
+    }
+
+    // Frame Loop (Feeds camera frames to FaceMesh and renders video constantly)
+    async function processFrame() {
+      if (videoElement.readyState >= 2 && !isProcessingFrame) {
+        isProcessingFrame = true;
+        try {
           await faceMesh.send({ image: videoElement });
-        },
-        width: 1280,
-        height: 720,
-        facingMode: isFrontCamera ? 'user' : 'environment'
-      });
-      cameraInstance.start();
+        } catch (e) {
+          // Fallback draw camera if faceMesh is still loading
+          onResults({ image: videoElement, multiFaceLandmarks: [] });
+        }
+        isProcessingFrame = false;
+      } else if (videoElement.readyState >= 2) {
+        // Render fallback camera stream if FaceMesh is busy
+        onResults({ image: videoElement, multiFaceLandmarks: [] });
+      }
+      requestAnimationFrame(processFrame);
     }
 
     startCamera();
