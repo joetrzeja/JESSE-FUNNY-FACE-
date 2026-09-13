@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Jesse Funny Face</title>
+  <title>Jesse Funny Face - 2 Player Multi-Face</title>
 
   <!-- MediaPipe Face Mesh CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
@@ -25,7 +25,7 @@
       background: #000;
     }
 
-    /* Video stream element (Kept in DOM to maintain mobile WebKit decoder) */
+    /* Video element kept invisible but active in DOM for mobile WebKit GPU processing */
     video {
       position: absolute;
       top: 0; left: 0;
@@ -36,7 +36,7 @@
       z-index: 1;
     }
 
-    /* Fullscreen Main Display Canvas */
+    /* Main Display Canvas */
     canvas {
       position: absolute;
       top: 0; left: 0;
@@ -164,11 +164,11 @@
   <div id="app-container">
     <video id="webcam" playsinline autoplay muted></video>
     <canvas id="output_canvas"></canvas>
-    <div id="face-warning">🎯 Position face in frame</div>
+    <div id="face-warning">👥 Position face(s) in frame</div>
 
     <!-- UI Overlay Header -->
     <div id="top-header">
-      <div id="brand-title">🤪 Jesse Funny Face</div>
+      <div id="brand-title">🤪 Jesse Funny Face (2 Faces)</div>
       <div id="action-bar">
         <button class="action-btn" onclick="takePhoto()">📸 Photo</button>
         <button class="action-btn" onclick="switchCamera()">🔄 Flip Camera</button>
@@ -194,11 +194,15 @@
     let isFrontCamera = true;
     let activeFilterIndex = 0;
     let soundEnabled = true;
-    let latestLandmarks = null;
+    let latestMultiLandmarks = null;
     let isAIProcessing = false;
     let noFaceCounter = 0;
 
-    // Filter List Definition
+    // Landmark Indices
+    const LIPS_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
+    const LIPS_INNER = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191];
+
+    // Filter Definition List
     const FILTERS = [
       { id: 0, icon: "👴", name: "1. Old Age Wrinkles", type: "aged" },
       { id: 1, icon: "🕶️", name: "2. Cool Sunglasses", type: "emoji", emoji: "🕶️", anchor: "eyes" },
@@ -235,7 +239,7 @@
       document.getElementById('sound-btn').innerText = soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF";
     }
 
-    // Render Filter Buttons
+    // Filter Buttons UI Setup
     function initFilterUI() {
       filterBar.innerHTML = '';
       FILTERS.forEach((f) => {
@@ -262,7 +266,7 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Camera Stream Controller
+    // Camera Controller
     async function startCamera() {
       if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
@@ -279,7 +283,13 @@
         video.srcObject = stream;
         await video.play();
       } catch (err) {
-        alert("Camera error: " + err.message);
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          video.srcObject = fallbackStream;
+          await video.play();
+        } catch (e) {
+          alert("Camera access failed: " + e.message);
+        }
       }
     }
 
@@ -289,7 +299,7 @@
       await startCamera();
     }
 
-    // Capture & Share Photo
+    // Photo Share
     function takePhoto() {
       playPopSound();
       canvas.toBlob(async (blob) => {
@@ -318,7 +328,7 @@
       const vW = video.videoWidth || 640;
       const vH = video.videoHeight || 480;
 
-      // Calculate exact Object-Fit Cover math
+      // Aspect Cover Calculations
       const scale = Math.max(W / vW, H / vH);
       const renderW = vW * scale;
       const renderH = vH * scale;
@@ -327,33 +337,35 @@
 
       ctx.clearRect(0, 0, W, H);
 
-      // Draw Video Feed (Centred & Mirrored correctly)
+      // Draw Video Stream
       ctx.save();
       if (isFrontCamera) {
         ctx.translate(W, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(video, (W - renderW) / 2, offsetY, renderW, renderH);
+        ctx.drawImage(video, offsetX, offsetY, renderW, renderH);
       } else {
         ctx.drawImage(video, offsetX, offsetY, renderW, renderH);
       }
       ctx.restore();
 
-      // Render AR Filter Layer if Face Landmarks Exist
-      if (latestLandmarks) {
-        // Map raw normalized points to exact canvas pixel coordinates
-        const pts = latestLandmarks.map(lm => {
-          const rawX = offsetX + lm.x * renderW;
-          const screenX = isFrontCamera ? (W - rawX) : rawX;
-          const screenY = offsetY + lm.y * renderH;
-          return { x: screenX, y: screenY };
-        });
+      // Render Filters on ALL DETECTED FACES (Up to 2 simultaneously)
+      if (latestMultiLandmarks && latestMultiLandmarks.length > 0) {
+        latestMultiLandmarks.forEach((faceLandmarks) => {
+          const pts = faceLandmarks.landmark.map(lm => {
+            const screenX = isFrontCamera 
+              ? (offsetX + (1 - lm.x) * renderW) 
+              : (offsetX + lm.x * renderW);
+            const screenY = offsetY + lm.y * renderH;
+            return { x: screenX, y: screenY };
+          });
 
-        drawFilter(pts);
+          drawFilterOnFace(pts);
+        });
       }
     }
 
-    // Filter Drawing Logic
-    function drawFilter(pts) {
+    // Draw AR Filter on an Individual Face
+    function drawFilterOnFace(pts) {
       const f = FILTERS.find(item => item.id === activeFilterIndex) || FILTERS[0];
 
       const nose = pts[4];
@@ -361,9 +373,10 @@
       const rEye = pts[386];
       const forehead = pts[10];
 
-      // Calculate scale & angle from eyes
+      if (!nose || !lEye || !rEye) return;
+
       const eyeDist = Math.hypot(rEye.x - lEye.x, rEye.y - lEye.y);
-      const scale = Math.max(eyeDist / 60, 0.4);
+      const scale = Math.max(eyeDist / 60, 0.35);
       const angle = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
 
       switch(f.type) {
@@ -377,20 +390,18 @@
             anchorX = (lEye.x + rEye.x) / 2;
             anchorY = (lEye.y + rEye.y) / 2;
           }
-          drawEmoji(f.emoji, anchorX, anchorY, 130 * scale, angle);
+          drawEmoji(f.emoji, anchorX, anchorY, Math.max(12, Math.floor(130 * scale)), angle);
           break;
 
         case 'aged':
           ctx.save();
-          ctx.strokeStyle = 'rgba(75, 45, 20, 0.75)';
-          ctx.lineWidth = 3 * scale;
+          ctx.strokeStyle = 'rgba(75, 45, 20, 0.8)';
+          ctx.lineWidth = Math.max(2, 3.5 * scale);
           ctx.lineCap = 'round';
-          // Forehead lines
           drawPath(pts, [109, 10, 338]); ctx.stroke();
           drawPath(pts, [67, 151, 297]); ctx.stroke();
-          // Eyebrows
-          ctx.strokeStyle = 'rgba(240, 240, 240, 0.9)';
-          ctx.lineWidth = 14 * scale;
+          ctx.strokeStyle = 'rgba(240, 240, 240, 0.95)';
+          ctx.lineWidth = Math.max(6, 14 * scale);
           drawPath(pts, [70, 63, 105, 66, 107]); ctx.stroke();
           drawPath(pts, [300, 293, 334, 296, 336]); ctx.stroke();
           ctx.restore();
@@ -398,16 +409,19 @@
 
         case 'makeup':
           ctx.save();
-          ctx.fillStyle = 'rgba(210, 20, 60, 0.8)';
-          drawPath(pts, [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 146], true);
+          ctx.fillStyle = 'rgba(210, 20, 60, 0.85)';
+          drawPath(pts, LIPS_OUTER, true);
+          ctx.fill();
+          ctx.globalCompositeOperation = 'destination-out';
+          drawPath(pts, LIPS_INNER, true);
           ctx.fill();
           ctx.restore();
           break;
 
         case 'gigachad':
           ctx.save();
-          ctx.strokeStyle = '#221100';
-          ctx.lineWidth = 12 * scale;
+          ctx.strokeStyle = 'rgba(30, 20, 10, 0.9)';
+          ctx.lineWidth = Math.max(4, 12 * scale);
           drawPath(pts, [172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397]);
           ctx.stroke();
           ctx.restore();
@@ -416,14 +430,16 @@
         case 'vampire':
           if (!pts[37] || !pts[267]) return;
           ctx.save();
-          ctx.fillStyle = '#FFF';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.strokeStyle = '#CCCCCC';
+          ctx.lineWidth = 1;
           [pts[37], pts[267]].forEach(pt => {
             ctx.beginPath();
             ctx.moveTo(pt.x - 6 * scale, pt.y);
             ctx.lineTo(pt.x + 6 * scale, pt.y);
-            ctx.lineTo(pt.x, pt.y + 24 * scale);
+            ctx.lineTo(pt.x, pt.y + 26 * scale);
             ctx.closePath();
-            ctx.fill();
+            ctx.fill(); ctx.stroke();
           });
           ctx.restore();
           break;
@@ -433,11 +449,11 @@
             ctx.save();
             ctx.beginPath();
             ctx.arc(eye.x, eye.y, 25 * scale, 0, 2 * Math.PI);
-            ctx.fillStyle = '#FFF'; ctx.fill();
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#FFFFFF'; ctx.fill();
+            ctx.strokeStyle = '#000000'; ctx.lineWidth = 2.5; ctx.stroke();
             ctx.beginPath();
-            ctx.arc(eye.x + Math.sin(Date.now() * 0.01) * 6, eye.y, 10 * scale, 0, 2 * Math.PI);
-            ctx.fillStyle = '#000'; ctx.fill();
+            ctx.arc(eye.x + Math.sin(Date.now() * 0.01) * (6 * scale), eye.y, 10 * scale, 0, 2 * Math.PI);
+            ctx.fillStyle = '#000000'; ctx.fill();
             ctx.restore();
           });
           break;
@@ -446,6 +462,8 @@
           ctx.save();
           ctx.strokeStyle = '#00FFFF';
           ctx.lineWidth = 1.5;
+          ctx.shadowColor = '#00FFFF';
+          ctx.shadowBlur = 8;
           drawPath(pts, [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 152, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109], true);
           ctx.stroke();
           ctx.restore();
@@ -455,34 +473,39 @@
 
     function drawPath(pts, indices, isClosed = false) {
       ctx.beginPath();
-      indices.forEach((idx, i) => {
+      let started = false;
+      indices.forEach((idx) => {
         const p = pts[idx];
         if (p) {
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
+          if (!started) {
+            ctx.moveTo(p.x, p.y);
+            started = true;
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
         }
       });
-      if (isClosed) ctx.closePath();
+      if (isClosed && started) ctx.closePath();
     }
 
     function drawEmoji(emoji, x, y, size, angle) {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(angle);
-      ctx.font = `${size}px sans-serif`;
+      ctx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(emoji, 0, 0);
       ctx.restore();
     }
 
-    // --- BACKGROUND NON-BLOCKING AI LOOP ---
+    // --- BACKGROUND NON-BLOCKING 2-FACE AI ENGINE ---
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
 
     faceMesh.setOptions({
-      maxNumFaces: 1,
+      maxNumFaces: 2, // Multi-face tracking enabled
       refineLandmarks: true,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
@@ -490,13 +513,13 @@
 
     faceMesh.onResults((results) => {
       if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        latestLandmarks = results.multiFaceLandmarks[0].landmark;
+        latestMultiLandmarks = results.multiFaceLandmarks;
         noFaceCounter = 0;
         faceWarning.style.display = 'none';
       } else {
         noFaceCounter++;
         if (noFaceCounter > 15) {
-          latestLandmarks = null;
+          latestMultiLandmarks = null;
           faceWarning.style.display = 'block';
         }
       }
