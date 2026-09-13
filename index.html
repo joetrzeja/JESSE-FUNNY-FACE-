@@ -5,14 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Jesse Funny Face</title>
 
-  <!-- PWA & Mobile Web App Meta Tags -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Jesse Face">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#000000">
-
-  <!-- Stable MediaPipe Scripts -->
+  <!-- MediaPipe Face Mesh CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
   <style>
@@ -31,18 +24,19 @@
       overflow: hidden;
       background: #000;
     }
-    
-    /* Video element kept alive for mobile WebKit GPU pipeline */
+
+    /* Video stream element (Kept in DOM to maintain mobile WebKit decoder) */
     video {
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
       object-fit: cover;
-      z-index: 1;
       opacity: 0.001;
       pointer-events: none;
+      z-index: 1;
     }
-    
+
+    /* Fullscreen Main Display Canvas */
     canvas {
       position: absolute;
       top: 0; left: 0;
@@ -50,197 +44,90 @@
       z-index: 2;
     }
 
-    /* Flash Animation */
-    #flash-overlay {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: white;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 50;
-      transition: opacity 0.05s ease-out;
-    }
-    #flash-overlay.flash { opacity: 0.9; }
-
-    /* Countdown Display */
-    #countdown-overlay {
-      position: absolute;
-      top: 40%; left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 100px;
-      font-weight: 900;
-      color: #FFD700;
-      z-index: 45;
-      text-shadow: 0 0 25px rgba(0,0,0,0.9);
-      pointer-events: none;
-      display: none;
-    }
-
-    /* Top App Header Controls */
+    /* Header Bar */
     #top-header {
       position: absolute;
       top: 0; left: 0; right: 0;
-      z-index: 30;
+      z-index: 10;
       background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
-      padding: 10px 8px 14px 8px;
+      padding: 12px 10px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
 
     #brand-title {
+      color: #FFD700;
+      font-size: 18px;
+      font-weight: 800;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.8);
       display: flex;
       align-items: center;
       gap: 6px;
-      color: #FFD700;
-      font-size: 17px;
-      font-weight: 800;
-      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-      letter-spacing: 0.5px;
-    }
-
-    #app-thumbnail {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #FFD700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
-      border: 2px solid #FFF;
     }
 
     #action-bar {
       display: flex;
       justify-content: center;
       flex-wrap: wrap;
-      gap: 5px;
+      gap: 6px;
       width: 100%;
     }
 
     .action-btn {
-      background: rgba(20, 20, 20, 0.8);
-      color: white;
-      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      background: rgba(30, 30, 30, 0.85);
+      color: #FFF;
+      border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 16px;
-      padding: 5px 9px;
-      font-size: 11px;
+      padding: 6px 12px;
+      font-size: 12px;
       font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 3px;
       backdrop-filter: blur(8px);
       cursor: pointer;
-      transition: transform 0.1s, background 0.2s;
     }
     .action-btn:active { transform: scale(0.95); }
 
-    #rec-btn.recording {
-      background: rgba(220, 20, 60, 0.9);
-      border-color: #FF0055;
-      animation: pulse 1.2s infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.7); }
-      70% { box-shadow: 0 0 0 12px rgba(255, 0, 85, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
-    }
-
-    /* Reticle Warning Prompt */
-    #face-reticle {
-      position: absolute;
-      top: 40%; left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 25;
-      background: rgba(0, 0, 0, 0.85);
-      color: #FFD700;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 700;
-      pointer-events: none;
-      backdrop-filter: blur(8px);
-      border: 1.5px solid #FFD700;
-      display: none;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    }
-
-    /* Bottom UI Controls */
+    /* Bottom Control Bar */
     #bottom-controls {
       position: absolute;
-      bottom: calc(20px + env(safe-area-inset-bottom, 16px));
+      bottom: calc(16px + env(safe-area-inset-bottom, 12px));
       left: 0; right: 0;
-      z-index: 30;
+      z-index: 10;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      pointer-events: none;
-    }
-
-    #bottom-controls > * {
-      pointer-events: auto;
+      gap: 8px;
     }
 
     #filter-label {
-      background: rgba(0, 0, 0, 0.85);
-      color: #FFF;
-      padding: 5px 14px;
-      border-radius: 16px;
-      font-weight: 700;
-      font-size: 12px;
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 215, 0, 0.5);
-      white-space: nowrap;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    }
-
-    #category-tabs {
-      display: flex;
-      gap: 4px;
       background: rgba(0, 0, 0, 0.8);
-      padding: 3px 6px;
-      border-radius: 18px;
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    .cat-tab {
-      color: rgba(255,255,255,0.7);
-      font-size: 10px;
-      font-weight: 700;
-      padding: 4px 10px;
+      color: #FFD700;
+      padding: 4px 14px;
       border-radius: 12px;
-      cursor: pointer;
-      transition: background 0.2s, color 0.2s;
-    }
-    .cat-tab.active {
-      background: #FFD700;
-      color: #000;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      backdrop-filter: blur(8px);
     }
 
     #filter-bar {
       width: 100%;
       display: flex;
-      gap: 10px;
+      gap: 12px;
       overflow-x: auto;
-      padding: 4px 16px;
-      scroll-behavior: smooth;
+      padding: 6px 16px;
       -webkit-overflow-scrolling: touch;
     }
     #filter-bar::-webkit-scrollbar { display: none; }
-    
+
     .filter-btn {
       flex: 0 0 auto;
-      width: 52px; height: 52px;
+      width: 54px; height: 54px;
       border-radius: 50%;
-      background: rgba(30, 30, 30, 0.85);
-      border: 2px solid rgba(255, 255, 255, 0.35);
-      color: white;
-      font-size: 24px;
+      background: rgba(20, 20, 20, 0.85);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      font-size: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -250,8 +137,25 @@
     }
     .filter-btn.active {
       border-color: #FFD700;
-      background: rgba(255, 215, 0, 0.4);
-      transform: scale(1.12);
+      background: rgba(255, 215, 0, 0.35);
+      transform: scale(1.1);
+    }
+
+    /* Reticle Warning */
+    #face-warning {
+      position: absolute;
+      top: 45%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      background: rgba(0,0,0,0.75);
+      color: #FFD700;
+      padding: 8px 16px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+      border: 1px solid #FFD700;
+      display: none;
     }
   </style>
 </head>
@@ -260,146 +164,70 @@
   <div id="app-container">
     <video id="webcam" playsinline autoplay muted></video>
     <canvas id="output_canvas"></canvas>
-    <div id="flash-overlay"></div>
-    <div id="countdown-overlay">3</div>
-    <div id="face-reticle">🎯 Position your face in frame</div>
+    <div id="face-warning">🎯 Position face in frame</div>
 
-    <input type="file" id="custom-face-input" accept="image/*" style="display:none" onchange="handleCustomFaceUpload(event)">
-
-    <!-- Top Header -->
+    <!-- UI Overlay Header -->
     <div id="top-header">
-      <div id="brand-title">
-        <div id="app-thumbnail">🤪</div>
-        <span>Jesse Funny Face</span>
-      </div>
+      <div id="brand-title">🤪 Jesse Funny Face</div>
       <div id="action-bar">
-        <button class="action-btn" id="photo-btn" onclick="takePhoto()">📸 Photo</button>
-        <button class="action-btn" id="timer-btn" onclick="startCountdown(3)">⏱️ 3s Timer</button>
-        <button class="action-btn" id="rec-btn" onclick="toggleRecording()">🎥 Record</button>
-        <button class="action-btn" id="voice-btn" onclick="toggleVoiceEffect()">🎙️ Voice: Normal</button>
-        <button class="action-btn" id="mood-btn" onclick="toggleColorMood()">🎨 Mood: Normal</button>
-        <button class="action-btn" id="flip-btn" onclick="switchCamera()">🔄 Flip</button>
-        <button class="action-btn" id="upload-btn" onclick="document.getElementById('custom-face-input').click()">🖼️ Upload</button>
+        <button class="action-btn" onclick="takePhoto()">📸 Photo</button>
+        <button class="action-btn" onclick="switchCamera()">🔄 Flip Camera</button>
         <button class="action-btn" id="sound-btn" onclick="toggleSound()">🔊 Sound ON</button>
       </div>
     </div>
 
-    <!-- Bottom Controls -->
+    <!-- UI Overlay Footer -->
     <div id="bottom-controls">
-      <div id="filter-label">1. Realistic Aged Face</div>
-      <div id="category-tabs">
-        <div class="cat-tab active" onclick="switchCategory('all', this)">All</div>
-        <div class="cat-tab" onclick="switchCategory('trending', this)">🔥 Trending</div>
-        <div class="cat-tab" onclick="switchCategory('realistic', this)">👴 Realistic</div>
-        <div class="cat-tab" onclick="switchCategory('vfx', this)">🤪 VFX & Fun</div>
-      </div>
+      <div id="filter-label">👴 1. Old Age Wrinkles</div>
       <div id="filter-bar"></div>
     </div>
   </div>
 
   <script>
-    const videoElement = document.getElementById('webcam');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
     const filterBar = document.getElementById('filter-bar');
     const filterLabel = document.getElementById('filter-label');
-    const faceReticle = document.getElementById('face-reticle');
-    const countdownOverlay = document.getElementById('countdown-overlay');
+    const faceWarning = document.getElementById('face-warning');
 
-    let currentFilterIndex = 0;
-    let soundEnabled = true;
-    let lastMouthSoundTime = 0;
     let isFrontCamera = true;
-    let noFaceFrameCounter = 0;
-    let customMaskImage = null;
-    let activeCategory = 'all';
-
-    let latestMultiLandmarks = null;
+    let activeFilterIndex = 0;
+    let soundEnabled = true;
+    let latestLandmarks = null;
     let isAIProcessing = false;
-    let isFaceMeshReady = false;
+    let noFaceCounter = 0;
 
-    const MOOD_PRESETS = [
-      { name: "Normal", filter: "none" },
-      { name: "VHS 📼", filter: "contrast(1.35) saturate(1.4) hue-rotate(-10deg)" },
-      { name: "Cyber Neon 🌆", filter: "contrast(1.4) saturate(2) drop-shadow(0 0 8px #FF00FF)" },
-      { name: "B&W Noir 🎬", filter: "grayscale(100%) contrast(1.3)" },
-      { name: "Warm Sunset 🌅", filter: "sepia(40%) saturate(1.5) contrast(1.1)" }
+    // Filter List Definition
+    const FILTERS = [
+      { id: 0, icon: "👴", name: "1. Old Age Wrinkles", type: "aged" },
+      { id: 1, icon: "🕶️", name: "2. Cool Sunglasses", type: "emoji", emoji: "🕶️", anchor: "eyes" },
+      { id: 2, icon: "💄", name: "3. Glam Makeup", type: "makeup" },
+      { id: 3, icon: "🗿", name: "4. Gigachad Jaw", type: "gigachad" },
+      { id: 4, icon: "🧛", name: "5. Vampire Fangs", type: "vampire" },
+      { id: 5, icon: "👑", name: "6. Royal Crown", type: "emoji", emoji: "👑", anchor: "head" },
+      { id: 6, icon: "🤡", name: "7. Scary Clown", type: "emoji", emoji: "🤡", anchor: "face" },
+      { id: 7, icon: "🤪", name: "8. Googly Eyes", type: "googly" },
+      { id: 8, icon: "😈", name: "9. Devil Horns", type: "emoji", emoji: "😈", anchor: "head" },
+      { id: 9, icon: "😇", name: "10. Angel Halo", type: "emoji", emoji: "😇", anchor: "head" },
+      { id: 10, icon: "🔥", name: "11. Fire Eyes", type: "emoji", emoji: "🔥", anchor: "eyes" },
+      { id: 11, icon: "🤖", name: "12. Cyber Mesh", type: "cyber" }
     ];
-    let currentMoodIndex = 0;
 
-    const VOICE_MODES = ["Normal", "Helium 🎈", "Deep Monster 👹"];
-    let currentVoiceIndex = 0;
-
+    // Audio Synthesizer
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    function playSound(type) {
+    function playPopSound() {
       if (!soundEnabled) return;
       if (audioCtx.state === 'suspended') audioCtx.resume();
-      
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      const now = audioCtx.currentTime;
-
-      switch(type) {
-        case 'boing':
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(150, now);
-          osc.frequency.exponentialRampToValueAtTime(650, now + 0.3);
-          gain.gain.setValueAtTime(0.5, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.3);
-          break;
-
-        case 'zap':
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(900, now);
-          osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
-          gain.gain.setValueAtTime(0.4, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.2);
-          break;
-
-        case 'squeak':
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(1100, now);
-          osc.frequency.linearRampToValueAtTime(1700, now + 0.12);
-          gain.gain.setValueAtTime(0.4, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.12);
-          break;
-
-        case 'honk':
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(220, now);
-          gain.gain.setValueAtTime(0.35, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.25);
-          break;
-
-        case 'pop':
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(500, now);
-          osc.frequency.exponentialRampToValueAtTime(100, now + 0.08);
-          gain.gain.setValueAtTime(0.6, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.08);
-          break;
-
-        case 'fart':
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(110, now);
-          osc.frequency.linearRampToValueAtTime(60, now + 0.35);
-          gain.gain.setValueAtTime(0.5, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start(now); osc.stop(now + 0.35);
-          break;
-      }
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.08);
     }
 
     function toggleSound() {
@@ -407,707 +235,289 @@
       document.getElementById('sound-btn').innerText = soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF";
     }
 
-    function toggleColorMood() {
-      currentMoodIndex = (currentMoodIndex + 1) % MOOD_PRESETS.length;
-      document.getElementById('mood-btn').innerText = `🎨 Mood: ${MOOD_PRESETS[currentMoodIndex].name}`;
-      playSound('pop');
-    }
-
-    function toggleVoiceEffect() {
-      currentVoiceIndex = (currentVoiceIndex + 1) % VOICE_MODES.length;
-      document.getElementById('voice-btn').innerText = `🎙️ Voice: ${VOICE_MODES[currentVoiceIndex]}`;
-      playSound('pop');
-    }
-
-    const LIPS_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
-    const LIPS_INNER = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191];
-    const L_EYE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
-    const R_EYE = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398];
-    const L_EYEBROW = [70, 63, 105, 66, 107];
-    const R_EYEBROW = [300, 293, 334, 296, 336];
-    const JAWLINE = [172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397];
-
-    const FILTER_LIST = [
-      { id: 0,  cat: 'realistic', icon: "👴", name: "1. Realistic Aged Face", sound: 'honk', type: 'vector_aged' },
-      { id: 1,  cat: 'realistic', icon: "💄", name: "2. Hollywood Glam Makeup", sound: 'squeak', type: 'vector_makeup' },
-      { id: 2,  cat: 'realistic', icon: "🗿", name: "3. Gigachad Chiseled Jaw", sound: 'zap', type: 'vector_gigachad' },
-      { id: 3,  cat: 'realistic', icon: "🧛", name: "4. Vampire Fangs & Blood", sound: 'zap', type: 'vector_vampire' },
-      { id: 4,  cat: 'trending',  icon: "👄", name: "5. Big Mouth Warp", sound: 'boing', type: 'warp_mouth' },
-      { id: 5,  cat: 'trending',  icon: "👀", name: "6. Alien Big Eyes Warp", sound: 'zap', type: 'warp_eyes' },
-      { id: 6,  cat: 'vfx',       icon: "🤖", name: "7. Cyberpunk Wireframe", sound: 'zap', type: 'vector_cyberpunk' },
-      { id: 7,  cat: 'trending',  icon: "😭", name: "8. Realistic Tear Stream", sound: 'boing', type: 'vector_crying' },
-      { id: 8,  cat: 'vfx',       icon: "🖼️", name: "9. Custom Mask Upload", sound: 'pop', type: 'custom_upload' },
-      { id: 9,  cat: 'vfx',       icon: "🤪", name: "10. Circus Googly Eyes", sound: 'boing', type: 'custom_googly' },
-      { id: 10, cat: 'vfx',       icon: "🕶️", name: "11. Thug Life Shades", sound: 'pop', type: 'emoji', emoji: "🕶️", anchor: 'eyes' },
-      { id: 11, cat: 'vfx',       icon: "🤓", name: "12. TikTok Geek/Nerd", sound: 'squeak', type: 'emoji', emoji: "🤓", anchor: 'eyes' },
-      { id: 12, cat: 'vfx',       icon: "🤡", name: "13. Scary Clown", sound: 'honk', type: 'emoji', emoji: "🤡", anchor: 'face' },
-      { id: 13, cat: 'vfx',       icon: "👨‍🍳", name: "14. Master Chef", sound: 'pop', type: 'emoji', emoji: "👨‍🍳", anchor: 'head' },
-      { id: 14, cat: 'vfx',       icon: "🥷", name: "15. Shadow Ninja Mask", sound: 'zap', type: 'emoji', emoji: "🥷", anchor: 'face' },
-      { id: 15, cat: 'vfx',       icon: "🎅", name: "16. Santa Claus", sound: 'honk', type: 'emoji', emoji: "🎅", anchor: 'head' },
-      { id: 16, cat: 'vfx',       icon: "👑", name: "17. Royal King Crown", sound: 'honk', type: 'emoji', emoji: "👑", anchor: 'head' },
-      { id: 17, cat: 'vfx',       icon: "🧙", name: "18. Grand Wizard", sound: 'boing', type: 'emoji', emoji: "🧙", anchor: 'head' },
-      { id: 18, cat: 'vfx',       icon: "🏴‍☠️", name: "19. Pirate Captain", sound: 'zap', type: 'emoji', emoji: "🏴‍☠️", anchor: 'head' },
-      { id: 19, cat: 'vfx',       icon: "🤖", name: "20. Cyborg Lens", sound: 'zap', type: 'emoji', emoji: "🤖", anchor: 'face' },
-      { id: 20, cat: 'vfx',       icon: "👽", name: "21. Alien Cyclops", sound: 'zap', type: 'emoji', emoji: "👽", anchor: 'face' },
-      { id: 21, cat: 'vfx',       icon: "😈", name: "22. Devil Horns", sound: 'zap', type: 'emoji', emoji: "😈", anchor: 'head' },
-      { id: 22, cat: 'vfx',       icon: "😇", name: "23. Angel Halo", sound: 'squeak', type: 'emoji', emoji: "😇", anchor: 'head' },
-      { id: 23, cat: 'vfx',       icon: "🤩", name: "24. Anime Star Eyes", sound: 'pop', type: 'emoji', emoji: "🤩", anchor: 'eyes' },
-      { id: 24, cat: 'vfx',       icon: "🔥", name: "25. Fire Flame Eyes", sound: 'zap', type: 'emoji', emoji: "🔥", anchor: 'eyes' },
-      { id: 25, cat: 'vfx',       icon: "🥳", name: "26. Party Celebration", sound: 'pop', type: 'emoji', emoji: "🥳", anchor: 'head' },
-      { id: 26, cat: 'vfx',       icon: "🧐", name: "27. Fancy Monocle", sound: 'honk', type: 'emoji', emoji: "🧐", anchor: 'eyes' },
-      { id: 27, cat: 'vfx',       icon: "🎭", name: "28. Masquerade Mask", sound: 'honk', type: 'emoji', emoji: "🎭", anchor: 'eyes' }
-    ];
-
-    function renderFilterButtons() {
+    // Render Filter Buttons
+    function initFilterUI() {
       filterBar.innerHTML = '';
-      FILTER_LIST.forEach((f) => {
-        if (activeCategory !== 'all' && f.cat !== activeCategory) return;
-
+      FILTERS.forEach((f) => {
         const btn = document.createElement('div');
-        btn.className = `filter-btn ${f.id === currentFilterIndex ? 'active' : ''}`;
+        btn.className = `filter-btn ${f.id === activeFilterIndex ? 'active' : ''}`;
         btn.innerHTML = f.icon;
         btn.onclick = () => {
           document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          currentFilterIndex = f.id;
-          filterLabel.innerText = f.name;
-          playSound(f.sound);
-          if (f.type === 'custom_upload' && !customMaskImage) {
-            document.getElementById('custom-face-input').click();
-          }
+          activeFilterIndex = f.id;
+          filterLabel.innerText = `${f.icon} ${f.name}`;
+          playPopSound();
         };
         filterBar.appendChild(btn);
       });
     }
+    initFilterUI();
 
-    function switchCategory(cat, el) {
-      activeCategory = cat;
-      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
-      if (el) el.classList.add('active');
-      renderFilterButtons();
-      playSound('pop');
+    // Canvas Resize Sync
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-    renderFilterButtons();
-
-    function syncCanvasSize() {
-      canvasElement.width = window.innerWidth;
-      canvasElement.height = window.innerHeight;
-    }
-    window.addEventListener('resize', syncCanvasSize);
-    syncCanvasSize();
-
-    function handleCustomFaceUpload(event) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            customMaskImage = img;
-            filterLabel.innerText = "9. Custom Mask Active";
-          };
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+    // Camera Stream Controller
+    async function startCamera() {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: isFrontCamera ? 'user' : 'environment',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+        await video.play();
+      } catch (err) {
+        alert("Camera error: " + err.message);
       }
     }
 
     async function switchCamera() {
       isFrontCamera = !isFrontCamera;
-      playSound('pop');
+      playPopSound();
       await startCamera();
     }
 
-    function startCountdown(seconds) {
-      let count = seconds;
-      playSound('pop');
-      countdownOverlay.innerText = count;
-      countdownOverlay.style.display = 'block';
-
-      const timerInterval = setInterval(() => {
-        count--;
-        if (count > 0) {
-          countdownOverlay.innerText = count;
-          playSound('boing');
-        } else {
-          clearInterval(timerInterval);
-          countdownOverlay.style.display = 'none';
-          takePhoto();
-        }
-      }, 1000);
-    }
-
-    async function takePhoto() {
-      playSound('pop');
-      const flash = document.getElementById('flash-overlay');
-      flash.classList.add('flash');
-      setTimeout(() => flash.classList.remove('flash'), 150);
-
-      canvasElement.toBlob(async (blob) => {
+    // Capture & Share Photo
+    function takePhoto() {
+      playPopSound();
+      canvas.toBlob(async (blob) => {
         const file = new File([blob], `jesse_funny_face_${Date.now()}.png`, { type: 'image/png' });
-        
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({
-              files: [file],
-              title: 'Jesse Funny Face',
-              text: 'Check out this funny face I made with Jesse Funny Face! 🤪'
-            });
-          } catch (err) {
-            console.log("Share canceled", err);
-          }
-        } else {
-          const link = document.createElement('a');
-          link.download = file.name;
-          link.href = URL.createObjectURL(blob);
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(link.href), 100);
-        }
-      }, 'image/png');
-    }
-
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let isRecording = false;
-
-    async function toggleRecording() {
-      const recBtn = document.getElementById('rec-btn');
-
-      if (!isRecording) {
-        recordedChunks = [];
-        let canvasStream = canvasElement.captureStream(30);
-        let finalStream = canvasStream;
-
-        try {
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const source = micAudioCtx.createMediaStreamSource(micStream);
-          const filter = micAudioCtx.createBiquadFilter();
-
-          if (currentVoiceIndex === 1) {
-            filter.type = 'highpass';
-            filter.frequency.value = 1100;
-          } else if (currentVoiceIndex === 2) {
-            filter.type = 'lowpass';
-            filter.frequency.value = 450;
-          } else {
-            filter.type = 'allpass';
-          }
-
-          const dest = micAudioCtx.createMediaStreamDestination();
-          source.connect(filter);
-          filter.connect(dest);
-
-          const combinedTracks = [...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()];
-          finalStream = new MediaStream(combinedTracks);
-        } catch (err) {
-          console.warn("Microphone unavailable, recording without audio stream.");
-        }
-
-        let mimeType = 'video/webm';
-        if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
-
-        mediaRecorder = new MediaRecorder(finalStream, { mimeType });
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) recordedChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: mimeType });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.style.display = 'none';
-          a.href = url;
-          a.download = `jesse_funny_video_${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 100);
-        };
-
-        mediaRecorder.start();
-        isRecording = true;
-        recBtn.classList.add('recording');
-        recBtn.innerText = "🛑 Stop";
-        playSound('boing');
-      } else {
-        mediaRecorder.stop();
-        isRecording = false;
-        recBtn.classList.remove('recording');
-        recBtn.innerText = "🎥 Record";
-        playSound('pop');
-      }
-    }
-
-    function drawLandmarkPath(pts, indices, isClosed = false) {
-      if (!pts || !indices || indices.length === 0) return;
-      canvasCtx.beginPath();
-      let started = false;
-      for (let i = 0; i < indices.length; i++) {
-        const pt = pts[indices[i]];
-        if (pt && typeof pt.x === 'number' && typeof pt.y === 'number') {
-          if (!started) {
-            canvasCtx.moveTo(pt.x, pt.y);
-            started = true;
-          } else {
-            canvasCtx.lineTo(pt.x, pt.y);
-          }
-        }
-      }
-      if (isClosed && started) canvasCtx.closePath();
-    }
-
-    function renderAgedFace(pts, scale) {
-      canvasCtx.save();
-      canvasCtx.globalCompositeOperation = 'multiply';
-      canvasCtx.strokeStyle = 'rgba(74, 46, 27, 0.8)';
-      canvasCtx.lineWidth = Math.max(3.5 * scale, 2);
-      canvasCtx.lineCap = 'round';
-
-      drawLandmarkPath(pts, [109, 10, 338]); canvasCtx.stroke();
-      drawLandmarkPath(pts, [67, 151, 297]); canvasCtx.stroke();
-      drawLandmarkPath(pts, [103, 9, 332]); canvasCtx.stroke();
-      drawLandmarkPath(pts, [130, 247, 33]); canvasCtx.stroke();
-      drawLandmarkPath(pts, [359, 467, 263]); canvasCtx.stroke();
-      drawLandmarkPath(pts, [205, 206, 92, 165, 61]); canvasCtx.stroke();
-      drawLandmarkPath(pts, [425, 426, 322, 391, 291]); canvasCtx.stroke();
-
-      canvasCtx.globalCompositeOperation = 'source-over';
-      canvasCtx.strokeStyle = 'rgba(235, 235, 235, 0.95)';
-      canvasCtx.lineWidth = 15 * scale;
-      drawLandmarkPath(pts, L_EYEBROW); canvasCtx.stroke();
-      drawLandmarkPath(pts, R_EYEBROW); canvasCtx.stroke();
-
-      canvasCtx.restore();
-    }
-
-    function renderMakeup(pts, scale) {
-      canvasCtx.save();
-      canvasCtx.fillStyle = 'rgba(193, 18, 31, 0.85)';
-      drawLandmarkPath(pts, LIPS_OUTER, true);
-      canvasCtx.fill();
-
-      canvasCtx.globalCompositeOperation = 'destination-out';
-      drawLandmarkPath(pts, LIPS_INNER, true);
-      canvasCtx.fill();
-      canvasCtx.globalCompositeOperation = 'source-over';
-
-      canvasCtx.strokeStyle = '#000000';
-      canvasCtx.lineWidth = 4 * scale;
-      drawLandmarkPath(pts, L_EYE, true); canvasCtx.stroke();
-      drawLandmarkPath(pts, R_EYE, true); canvasCtx.stroke();
-
-      if (pts[234] && pts[454]) {
-        canvasCtx.fillStyle = 'rgba(255, 105, 180, 0.45)';
-        canvasCtx.beginPath();
-        canvasCtx.arc(pts[234].x, pts[234].y, 30 * scale, 0, 2 * Math.PI);
-        canvasCtx.arc(pts[454].x, pts[454].y, 30 * scale, 0, 2 * Math.PI);
-        canvasCtx.fill();
-      }
-
-      canvasCtx.restore();
-    }
-
-    function renderGigachad(pts, scale) {
-      canvasCtx.save();
-      canvasCtx.strokeStyle = 'rgba(43, 33, 30, 0.85)';
-      canvasCtx.lineWidth = 15 * scale;
-      canvasCtx.lineCap = 'round';
-      drawLandmarkPath(pts, JAWLINE);
-      canvasCtx.stroke();
-
-      if (pts[159] && pts[386]) {
-        canvasCtx.fillStyle = '#111111';
-        canvasCtx.strokeStyle = '#D4AF37';
-        canvasCtx.lineWidth = 4 * scale;
-
-        canvasCtx.beginPath();
-        canvasCtx.ellipse(pts[159].x, pts[159].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
-        canvasCtx.ellipse(pts[386].x, pts[386].y, 38 * scale, 28 * scale, 0, 0, 2 * Math.PI);
-        canvasCtx.fill();
-        canvasCtx.stroke();
-      }
-
-      canvasCtx.restore();
-    }
-
-    function renderVampire(pts, scale) {
-      if (!pts[37] || !pts[267]) return;
-      canvasCtx.save();
-      
-      const lFang = pts[37];
-      const rFang = pts[267];
-      const fangLen = 28 * scale;
-
-      canvasCtx.fillStyle = '#FFFFFF';
-      canvasCtx.strokeStyle = '#CCCCCC';
-      canvasCtx.lineWidth = 1.5;
-
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(lFang.x - 7 * scale, lFang.y);
-      canvasCtx.lineTo(lFang.x + 7 * scale, lFang.y);
-      canvasCtx.lineTo(lFang.x, lFang.y + fangLen);
-      canvasCtx.closePath();
-      canvasCtx.fill(); canvasCtx.stroke();
-
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(rFang.x - 7 * scale, rFang.y);
-      canvasCtx.lineTo(rFang.x + 7 * scale, rFang.y);
-      canvasCtx.lineTo(rFang.x, rFang.y + fangLen);
-      canvasCtx.closePath();
-      canvasCtx.fill(); canvasCtx.stroke();
-
-      canvasCtx.fillStyle = '#900C3F';
-      canvasCtx.beginPath();
-      canvasCtx.arc(lFang.x, lFang.y + fangLen + 3, 3 * scale, 0, 2 * Math.PI);
-      canvasCtx.arc(rFang.x, rFang.y + fangLen + 3, 3 * scale, 0, 2 * Math.PI);
-      canvasCtx.fill();
-
-      canvasCtx.restore();
-    }
-
-    function renderCyberpunkMesh(pts) {
-      canvasCtx.save();
-      canvasCtx.strokeStyle = '#00FFFF';
-      canvasCtx.lineWidth = 1.5;
-      canvasCtx.shadowColor = '#00FFFF';
-      canvasCtx.shadowBlur = 8;
-
-      const meshIndices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-      drawLandmarkPath(pts, meshIndices, true); canvasCtx.stroke();
-      drawLandmarkPath(pts, [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2, 164, 0, 11, 12, 13, 14, 15, 16, 17, 18, 200, 199, 175, 152]); canvasCtx.stroke();
-
-      canvasCtx.restore();
-    }
-
-    function renderCryingTears(pts, scale) {
-      if (!pts[145] || !pts[374]) return;
-      canvasCtx.save();
-      canvasCtx.fillStyle = 'rgba(0, 191, 255, 0.85)';
-
-      const lEyePt = pts[145];
-      const rEyePt = pts[374];
-
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(lEyePt.x - 5 * scale, lEyePt.y);
-      canvasCtx.quadraticCurveTo(lEyePt.x - 10 * scale, lEyePt.y + 50 * scale, lEyePt.x - 4 * scale, lEyePt.y + 110 * scale);
-      canvasCtx.quadraticCurveTo(lEyePt.x + 8 * scale, lEyePt.y + 50 * scale, lEyePt.x + 5 * scale, lEyePt.y);
-      canvasCtx.fill();
-
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(rEyePt.x - 5 * scale, rEyePt.y);
-      canvasCtx.quadraticCurveTo(rEyePt.x + 10 * scale, rEyePt.y + 50 * scale, rEyePt.x + 4 * scale, rEyePt.y + 110 * scale);
-      canvasCtx.quadraticCurveTo(rEyePt.x - 8 * scale, rEyePt.y + 50 * scale, rEyePt.x + 5 * scale, rEyePt.y);
-      canvasCtx.fill();
-
-      canvasCtx.restore();
-    }
-
-    function applyPixelWarp(type, f, rawPts) {
-      if (!rawPts || videoElement.readyState < 2) return;
-      const s = f.scale;
-      const vW = videoElement.videoWidth || 640;
-      const vH = videoElement.videoHeight || 480;
-
-      if (type === 'warp_mouth') {
-        const mouthCenter = rawPts[14];
-        if (!mouthCenter) return;
-        const radius = 65 * s;
-
-        const cropW = Math.min(vW * 0.3, 140);
-        const cropH = Math.min(vH * 0.2, 90);
-
-        const srcX = Math.max(0, Math.min(vW - cropW, mouthCenter.x * vW - cropW / 2));
-        const srcY = Math.max(0, Math.min(vH - cropH, mouthCenter.y * vH - cropH / 2));
-
-        canvasCtx.save();
-        canvasCtx.beginPath();
-        canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
-        canvasCtx.clip();
-        
-        try {
-          canvasCtx.drawImage(
-            videoElement,
-            srcX, srcY, cropW, cropH,
-            f.mouth.x - radius * 1.3, f.mouth.y - radius * 1.1, radius * 2.6, radius * 2.2
-          );
-        } catch (e) {}
-        canvasCtx.restore();
-      } else if (type === 'warp_eyes') {
-        const radius = 45 * s;
-        const eyeLandmarks = [rawPts[159], rawPts[386]];
-        const screenEyes = [f.lEye, f.rEye];
-
-        screenEyes.forEach((eye, i) => {
-          const rawEye = eyeLandmarks[i];
-          if (!rawEye) return;
-
-          const cropW = Math.min(vW * 0.2, 100);
-          const cropH = Math.min(vH * 0.15, 80);
-          const srcX = Math.max(0, Math.min(vW - cropW, rawEye.x * vW - cropW / 2));
-          const srcY = Math.max(0, Math.min(vH - cropH, rawEye.y * vH - cropH / 2));
-
-          canvasCtx.save();
-          canvasCtx.beginPath();
-          canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
-          canvasCtx.clip();
-
-          try {
-            canvasCtx.drawImage(
-              videoElement,
-              srcX, srcY, cropW, cropH,
-              eye.x - radius * 1.4, eye.y - radius * 1.2, radius * 2.8, radius * 2.4
-            );
+            await navigator.share({ files: [file], title: 'Jesse Funny Face' });
           } catch (e) {}
-          canvasCtx.restore();
-        });
-      }
+        } else {
+          const a = document.createElement('a');
+          a.download = file.name;
+          a.href = URL.createObjectURL(blob);
+          a.click();
+        }
+      });
     }
 
-    function drawGraphicMask(img, x, y, width, height, angle = 0) {
-      if (!img) return;
-      canvasCtx.save();
-      canvasCtx.translate(x, y);
-      canvasCtx.rotate(angle);
-      canvasCtx.drawImage(img, -width / 2, -height / 2, width, height);
-      canvasCtx.restore();
-    }
+    // --- MAIN 60 FPS RENDER LOOP ---
+    function renderFrame() {
+      requestAnimationFrame(renderFrame);
 
-    function drawEmoji(emoji, x, y, size, angle = 0) {
-      canvasCtx.save();
-      canvasCtx.translate(x, y);
-      canvasCtx.rotate(angle);
-      canvasCtx.font = `${size}px sans-serif`;
-      canvasCtx.textAlign = 'center';
-      canvasCtx.textBaseline = 'middle';
-      canvasCtx.fillText(emoji, 0, 0);
-      canvasCtx.restore();
-    }
+      if (video.readyState < 2) return;
 
-    function drawWatermark(w, h) {
-      canvasCtx.save();
-      canvasCtx.font = "bold 14px -apple-system, BlinkMacSystemFont, sans-serif";
-      canvasCtx.fillStyle = "rgba(255, 215, 0, 0.85)";
-      canvasCtx.textAlign = "right";
-      canvasCtx.shadowColor = "rgba(0, 0, 0, 0.8)";
-      canvasCtx.shadowBlur = 4;
-      canvasCtx.fillText("🤪 Jesse Funny Face", w - 16, h - 160);
-      canvasCtx.restore();
-    }
+      const W = canvas.width;
+      const H = canvas.height;
+      const vW = video.videoWidth || 640;
+      const vH = video.videoHeight || 480;
 
-    // --- Core 60 FPS Render Pipeline ---
-    function drawScene() {
-      if (videoElement.readyState < 2) return;
+      // Calculate exact Object-Fit Cover math
+      const scale = Math.max(W / vW, H / vH);
+      const renderW = vW * scale;
+      const renderH = vH * scale;
+      const offsetX = (W - renderW) / 2;
+      const offsetY = (H - renderH) / 2;
 
-      const w = canvasElement.width;
-      const h = canvasElement.height;
-      const imgW = videoElement.videoWidth || 640;
-      const imgH = videoElement.videoHeight || 480;
+      ctx.clearRect(0, 0, W, H);
 
-      // Aspect Cover Math
-      const scaleCover = Math.max(w / imgW, h / imgH);
-      const drawW = imgW * scaleCover;
-      const drawH = imgH * scaleCover;
-      const dx = (w - drawW) / 2;
-      const dy = (h - drawH) / 2;
-
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, w, h);
-      canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
-
-      // Fixed Camera Mirroring Math
+      // Draw Video Feed (Centred & Mirrored correctly)
+      ctx.save();
       if (isFrontCamera) {
-        canvasCtx.translate(w, 0);
-        canvasCtx.scale(-1, 1);
-        canvasCtx.drawImage(videoElement, dx, dy, drawW, drawH);
+        ctx.translate(W, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, (W - renderW) / 2, offsetY, renderW, renderH);
       } else {
-        canvasCtx.drawImage(videoElement, dx, dy, drawW, drawH);
+        ctx.drawImage(video, offsetX, offsetY, renderW, renderH);
       }
-      canvasCtx.restore();
+      ctx.restore();
 
-      canvasCtx.filter = "none";
+      // Render AR Filter Layer if Face Landmarks Exist
+      if (latestLandmarks) {
+        // Map raw normalized points to exact canvas pixel coordinates
+        const pts = latestLandmarks.map(lm => {
+          const rawX = offsetX + lm.x * renderW;
+          const screenX = isFrontCamera ? (W - rawX) : rawX;
+          const screenY = offsetY + lm.y * renderH;
+          return { x: screenX, y: screenY };
+        });
 
-      // Synchronized Filter Mapping
-      if (latestMultiLandmarks && latestMultiLandmarks.length > 0) {
-        for (let i = 0; i < latestMultiLandmarks.length; i++) {
-          const rawPts = latestMultiLandmarks[i].landmark;
+        drawFilter(pts);
+      }
+    }
 
-          const pts = rawPts.map(lm => {
-            const screenX = isFrontCamera ? (dx + (1 - lm.x) * drawW) : (dx + lm.x * drawW);
-            const screenY = dy + lm.y * drawH;
-            return { x: screenX, y: screenY };
-          });
+    // Filter Drawing Logic
+    function drawFilter(pts) {
+      const f = FILTERS.find(item => item.id === activeFilterIndex) || FILTERS[0];
 
-          const nose = pts[4];
-          const lEye = pts[159];
-          const rEye = pts[386];
-          const mouth = pts[14];
-          const upperLip = pts[13];
-          const forehead = pts[10];
+      const nose = pts[4];
+      const lEye = pts[159];
+      const rEye = pts[386];
+      const forehead = pts[10];
 
-          const screenLeftEye = lEye.x < rEye.x ? lEye : rEye;
-          const screenRightEye = lEye.x < rEye.x ? rEye : lEye;
+      // Calculate scale & angle from eyes
+      const eyeDist = Math.hypot(rEye.x - lEye.x, rEye.y - lEye.y);
+      const scale = Math.max(eyeDist / 60, 0.4);
+      const angle = Math.atan2(rEye.y - lEye.y, rEye.x - lEye.x);
 
-          const eyeDist = Math.hypot(screenRightEye.x - screenLeftEye.x, screenRightEye.y - screenLeftEye.y);
-          const scale = Math.max(eyeDist / 70, 0.4);
-          const angle = Math.atan2(screenRightEye.y - screenLeftEye.y, screenRightEye.x - screenLeftEye.x);
-
-          const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
-          if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
-            playSound(FILTER_LIST.find(f => f.id === currentFilterIndex)?.sound || 'pop');
-            lastMouthSoundTime = Date.now();
+      switch(f.type) {
+        case 'emoji':
+          let anchorX = nose.x;
+          let anchorY = nose.y;
+          if (f.anchor === 'head') {
+            anchorX = forehead.x;
+            anchorY = forehead.y - 35 * scale;
+          } else if (f.anchor === 'eyes') {
+            anchorX = (lEye.x + rEye.x) / 2;
+            anchorY = (lEye.y + rEye.y) / 2;
           }
+          drawEmoji(f.emoji, anchorX, anchorY, 130 * scale, angle);
+          break;
 
-          renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, scale, angle }, rawPts);
+        case 'aged':
+          ctx.save();
+          ctx.strokeStyle = 'rgba(75, 45, 20, 0.75)';
+          ctx.lineWidth = 3 * scale;
+          ctx.lineCap = 'round';
+          // Forehead lines
+          drawPath(pts, [109, 10, 338]); ctx.stroke();
+          drawPath(pts, [67, 151, 297]); ctx.stroke();
+          // Eyebrows
+          ctx.strokeStyle = 'rgba(240, 240, 240, 0.9)';
+          ctx.lineWidth = 14 * scale;
+          drawPath(pts, [70, 63, 105, 66, 107]); ctx.stroke();
+          drawPath(pts, [300, 293, 334, 296, 336]); ctx.stroke();
+          ctx.restore();
+          break;
+
+        case 'makeup':
+          ctx.save();
+          ctx.fillStyle = 'rgba(210, 20, 60, 0.8)';
+          drawPath(pts, [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 146], true);
+          ctx.fill();
+          ctx.restore();
+          break;
+
+        case 'gigachad':
+          ctx.save();
+          ctx.strokeStyle = '#221100';
+          ctx.lineWidth = 12 * scale;
+          drawPath(pts, [172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397]);
+          ctx.stroke();
+          ctx.restore();
+          break;
+
+        case 'vampire':
+          if (!pts[37] || !pts[267]) return;
+          ctx.save();
+          ctx.fillStyle = '#FFF';
+          [pts[37], pts[267]].forEach(pt => {
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 6 * scale, pt.y);
+            ctx.lineTo(pt.x + 6 * scale, pt.y);
+            ctx.lineTo(pt.x, pt.y + 24 * scale);
+            ctx.closePath();
+            ctx.fill();
+          });
+          ctx.restore();
+          break;
+
+        case 'googly':
+          [lEye, rEye].forEach(eye => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(eye.x, eye.y, 25 * scale, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFF'; ctx.fill();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(eye.x + Math.sin(Date.now() * 0.01) * 6, eye.y, 10 * scale, 0, 2 * Math.PI);
+            ctx.fillStyle = '#000'; ctx.fill();
+            ctx.restore();
+          });
+          break;
+
+        case 'cyber':
+          ctx.save();
+          ctx.strokeStyle = '#00FFFF';
+          ctx.lineWidth = 1.5;
+          drawPath(pts, [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 152, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109], true);
+          ctx.stroke();
+          ctx.restore();
+          break;
+      }
+    }
+
+    function drawPath(pts, indices, isClosed = false) {
+      ctx.beginPath();
+      indices.forEach((idx, i) => {
+        const p = pts[idx];
+        if (p) {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+      });
+      if (isClosed) ctx.closePath();
+    }
+
+    function drawEmoji(emoji, x, y, size, angle) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.font = `${size}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, 0, 0);
+      ctx.restore();
+    }
+
+    // --- BACKGROUND NON-BLOCKING AI LOOP ---
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults((results) => {
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        latestLandmarks = results.multiFaceLandmarks[0].landmark;
+        noFaceCounter = 0;
+        faceWarning.style.display = 'none';
+      } else {
+        noFaceCounter++;
+        if (noFaceCounter > 15) {
+          latestLandmarks = null;
+          faceWarning.style.display = 'block';
         }
       }
+    });
 
-      drawWatermark(w, h);
-    }
-
-    async function sendFrameToAI() {
-      if (isFaceMeshReady && videoElement.readyState >= 2 && !isAIProcessing) {
+    async function processAIFrames() {
+      if (video.readyState >= 2 && !isAIProcessing) {
         isAIProcessing = true;
         try {
-          await faceMesh.send({ image: videoElement });
-        } catch (e) {
-          console.warn("AI Frame Skipped", e);
-        }
+          await faceMesh.send({ image: video });
+        } catch (e) {}
         isAIProcessing = false;
       }
+      setTimeout(processAIFrames, 30);
     }
 
-    function renderLoop() {
-      drawScene();
-      sendFrameToAI();
-      requestAnimationFrame(renderLoop);
-    }
-
-    function renderFilter(idx, f, rawPts) {
-      const filter = FILTER_LIST.find(item => item.id === idx) || FILTER_LIST[0];
-      const s = f.scale;
-      const a = f.angle;
-
-      switch(filter.type) {
-        case 'vector_aged': renderAgedFace(f.pts, s); break;
-        case 'vector_makeup': renderMakeup(f.pts, s); break;
-        case 'vector_gigachad': renderGigachad(f.pts, s); break;
-        case 'vector_vampire': renderVampire(f.pts, s); break;
-        case 'vector_cyberpunk': renderCyberpunkMesh(f.pts); break;
-        case 'vector_crying': renderCryingTears(f.pts, s); break;
-        case 'warp_mouth':
-        case 'warp_eyes':
-          applyPixelWarp(filter.type, f, rawPts);
-          break;
-        case 'custom_upload':
-          if (customMaskImage) drawGraphicMask(customMaskImage, f.nose.x, f.nose.y, 260 * s, 260 * s, a);
-          break;
-        case 'custom_googly':
-          drawGooglyEyes(f.lEye, f.rEye, 26 * s);
-          drawEmoji("🔴", f.nose.x, f.nose.y, 42 * s, a);
-          break;
-        case 'emoji':
-          let posX = f.nose.x, posY = f.nose.y;
-          if (filter.anchor === 'head') {
-            posX = f.forehead.x;
-            posY = f.forehead.y - 35 * s;
-          } else if (filter.anchor === 'eyes') {
-            posX = (f.lEye.x + f.rEye.x) / 2;
-            posY = (f.lEye.y + f.rEye.y) / 2;
-          }
-          drawEmoji(filter.emoji, posX, posY, 135 * s, a);
-          break;
-      }
-    }
-
-    function drawGooglyEyes(lEye, rEye, radius) {
-      const t = Date.now() * 0.012;
-      const pupilOffsetX = Math.sin(t) * (radius * 0.25);
-      const pupilOffsetY = Math.cos(t * 1.3) * (radius * 0.25);
-
-      [lEye, rEye].forEach(eye => {
-        canvasCtx.beginPath();
-        canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = '#FFFFFF'; canvasCtx.fill();
-        canvasCtx.lineWidth = 3; canvasCtx.strokeStyle = '#000000'; canvasCtx.stroke();
-
-        const px = eye.x + pupilOffsetX, py = eye.y + pupilOffsetY;
-        canvasCtx.beginPath();
-        canvasCtx.arc(px, py, radius * 0.4, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = '#000000'; canvasCtx.fill();
-
-        canvasCtx.beginPath();
-        canvasCtx.arc(px - radius * 0.1, py - radius * 0.1, radius * 0.1, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = '#FFFFFF'; canvasCtx.fill();
-      });
-    }
-
-    // MediaPipe FaceMesh Loader
-    let faceMesh = null;
-    try {
-      faceMesh = new FaceMesh({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-      });
-
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
-      faceMesh.onResults((results) => {
-        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-          latestMultiLandmarks = results.multiFaceLandmarks;
-          noFaceFrameCounter = 0;
-          faceReticle.style.display = 'none';
-        } else {
-          noFaceFrameCounter++;
-          if (noFaceFrameCounter > 15) {
-            latestMultiLandmarks = null;
-            faceReticle.style.display = 'block';
-          }
-        }
-      });
-      isFaceMeshReady = true;
-    } catch (e) {
-      console.error("MediaPipe initialization error", e);
-    }
-
-    // Camera Stream Initialization
-    async function startCamera() {
-      if (videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
-      }
-
-      let constraints = {
-        video: {
-          facingMode: isFrontCamera ? 'user' : 'environment',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        },
-        audio: false
-      };
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        videoElement.srcObject = stream;
-        await videoElement.play();
-      } catch (err) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-          videoElement.srcObject = stream;
-          await videoElement.play();
-        } catch (fallbackErr) {
-          alert("Unable to access camera: " + fallbackErr.message);
-        }
-      }
-    }
-
-    // App Initialization
+    // App Startup
     (async function init() {
       await startCamera();
-      requestAnimationFrame(renderLoop);
+      requestAnimationFrame(renderFrame);
+      processAIFrames();
     })();
   </script>
 </body>
