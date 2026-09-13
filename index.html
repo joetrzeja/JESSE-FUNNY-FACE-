@@ -12,7 +12,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#000000">
 
-  <!-- MediaPipe Face Mesh -->
+  <!-- Stable MediaPipe Bundles -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
   <style>
@@ -32,7 +33,6 @@
       background: #000;
     }
     
-    /* Background Video element keeps mobile WebKit GPU pipeline active */
     video {
       position: absolute;
       top: 0; left: 0;
@@ -315,8 +315,6 @@
     let customMaskImage = null;
     let activeCategory = 'all';
 
-    // State Variables for Decoupled Loop
-    let latestRawLandmarks = null;
     let latestMultiLandmarks = null;
     let isAIProcessing = false;
 
@@ -805,12 +803,13 @@
       canvasCtx.restore();
     }
 
+    // Safely Clamped Pixel Warp Engine (Prevents DOMExceptions & WebKit Crashes)
     function applyPixelWarp(type, f, rawPts) {
       if (!rawPts) return;
       const s = f.scale;
-      const vW = videoElement.videoWidth || 1280;
-      const vH = videoElement.videoHeight || 720;
-      
+      const vW = videoElement.videoWidth || 640;
+      const vH = videoElement.videoHeight || 480;
+
       if (type === 'warp_mouth') {
         const mouthCenter = rawPts[14];
         if (!mouthCenter) return;
@@ -818,20 +817,26 @@
 
         const cropW = 140;
         const cropH = 90;
-        const srcX = Math.max(0, mouthCenter.x * vW - cropW / 2);
-        const srcY = Math.max(0, mouthCenter.y * vH - cropH / 2);
 
-        canvasCtx.save();
-        canvasCtx.beginPath();
-        canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
-        canvasCtx.clip();
-        
-        canvasCtx.drawImage(
-          videoElement,
-          srcX, srcY, cropW, cropH,
-          f.mouth.x - radius * 1.3, f.mouth.y - radius * 1.1, radius * 2.6, radius * 2.2
-        );
-        canvasCtx.restore();
+        // Strictly clamp source coordinates to valid video bounds
+        const srcX = Math.max(0, Math.min(vW - cropW, mouthCenter.x * vW - cropW / 2));
+        const srcY = Math.max(0, Math.min(vH - cropH, mouthCenter.y * vH - cropH / 2));
+
+        try {
+          canvasCtx.save();
+          canvasCtx.beginPath();
+          canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
+          canvasCtx.clip();
+          
+          canvasCtx.drawImage(
+            videoElement,
+            srcX, srcY, cropW, cropH,
+            f.mouth.x - radius * 1.3, f.mouth.y - radius * 1.1, radius * 2.6, radius * 2.2
+          );
+          canvasCtx.restore();
+        } catch (e) {
+          console.warn("Warp draw skipped safely", e);
+        }
       } else if (type === 'warp_eyes') {
         const radius = 45 * s;
         const eyeLandmarks = [rawPts[159], rawPts[386]];
@@ -843,20 +848,24 @@
 
           const cropW = 100;
           const cropH = 80;
-          const srcX = Math.max(0, rawEye.x * vW - cropW / 2);
-          const srcY = Math.max(0, rawEye.y * vH - cropH / 2);
+          const srcX = Math.max(0, Math.min(vW - cropW, rawEye.x * vW - cropW / 2));
+          const srcY = Math.max(0, Math.min(vH - cropH, rawEye.y * vH - cropH / 2));
 
-          canvasCtx.save();
-          canvasCtx.beginPath();
-          canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
-          canvasCtx.clip();
+          try {
+            canvasCtx.save();
+            canvasCtx.beginPath();
+            canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
+            canvasCtx.clip();
 
-          canvasCtx.drawImage(
-            videoElement,
-            srcX, srcY, cropW, cropH,
-            eye.x - radius * 1.4, eye.y - radius * 1.2, radius * 2.8, radius * 2.4
-          );
-          canvasCtx.restore();
+            canvasCtx.drawImage(
+              videoElement,
+              srcX, srcY, cropW, cropH,
+              eye.x - radius * 1.4, eye.y - radius * 1.2, radius * 2.8, radius * 2.4
+            );
+            canvasCtx.restore();
+          } catch (e) {
+            console.warn("Eye warp draw skipped safely", e);
+          }
         });
       }
     }
@@ -892,16 +901,15 @@
       canvasCtx.restore();
     }
 
-    // --- 1. Dedicated 60 FPS Render Loop (Renders camera INSTANTLY) ---
+    // --- 60 FPS Instant Canvas Render Loop ---
     function drawScene() {
       if (videoElement.readyState < 2) return;
 
       const w = canvasElement.width;
       const h = canvasElement.height;
-      const imgW = videoElement.videoWidth || 1280;
-      const imgH = videoElement.videoHeight || 720;
+      const imgW = videoElement.videoWidth || 640;
+      const imgH = videoElement.videoHeight || 480;
 
-      // Aspect Cover Calculations
       const aspectImg = imgW / imgH;
       const aspectCanvas = w / h;
       let drawW, drawH, dx, dy;
@@ -922,7 +930,7 @@
       canvasCtx.clearRect(0, 0, w, h);
       canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
 
-      // Draw Video Feed
+      // Render Camera background frame
       if (isFrontCamera) {
         canvasCtx.translate(w, 0);
         canvasCtx.scale(-1, 1);
@@ -934,7 +942,7 @@
 
       canvasCtx.filter = "none";
 
-      // Render Active Filter if Face Landmarks exist
+      // Render Active Filter over Face Mesh
       if (latestMultiLandmarks && latestMultiLandmarks.length > 0) {
         for (let i = 0; i < latestMultiLandmarks.length; i++) {
           const rawPts = latestMultiLandmarks[i].landmark;
@@ -1037,21 +1045,7 @@
       });
     }
 
-    // --- 2. Decoupled AI Face Mesh Callback ---
-    function onResults(results) {
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        latestMultiLandmarks = results.multiFaceLandmarks;
-        noFaceFrameCounter = 0;
-        faceReticle.style.display = 'none';
-      } else {
-        noFaceFrameCounter++;
-        if (noFaceFrameCounter > 15) {
-          latestMultiLandmarks = null;
-          faceReticle.style.display = 'block';
-        }
-      }
-    }
-
+    // MediaPipe FaceMesh Initialization
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -1063,23 +1057,35 @@
       minTrackingConfidence: 0.5
     });
 
-    faceMesh.onResults(onResults);
+    faceMesh.onResults((results) => {
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        latestMultiLandmarks = results.multiFaceLandmarks;
+        noFaceFrameCounter = 0;
+        faceReticle.style.display = 'none';
+      } else {
+        noFaceFrameCounter++;
+        if (noFaceFrameCounter > 15) {
+          latestMultiLandmarks = null;
+          faceReticle.style.display = 'block';
+        }
+      }
+    });
 
-    // --- 3. Non-Blocking AI Process Loop ---
+    // Throttled Non-Blocking AI Processing Loop
     async function processAIFrames() {
       if (videoElement.readyState >= 2 && !isAIProcessing) {
         isAIProcessing = true;
         try {
           await faceMesh.send({ image: videoElement });
         } catch (e) {
-          console.warn("Skipped AI frame", e);
+          console.warn("AI frame skipped", e);
         }
         isAIProcessing = false;
       }
-      setTimeout(processAIFrames, 33); // ~30 FPS detection rate
+      setTimeout(processAIFrames, 33);
     }
 
-    // Camera Stream Loader
+    // Camera Stream Initialization (640x480 ideal resolution prevents GPU freezes)
     async function startCamera() {
       if (videoElement.srcObject) {
         videoElement.srcObject.getTracks().forEach(track => track.stop());
@@ -1088,8 +1094,8 @@
       let constraints = {
         video: {
           facingMode: isFrontCamera ? 'user' : 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         },
         audio: false
       };
@@ -1100,7 +1106,6 @@
         await videoElement.play();
       } catch (err) {
         try {
-          // Fallback simple camera constraints if ideal resolution rejected
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
           videoElement.srcObject = stream;
           await videoElement.play();
@@ -1110,11 +1115,11 @@
       }
     }
 
-    // Initialize App
+    // App Startup Sequence
     (async function init() {
       await startCamera();
-      requestAnimationFrame(renderLoop); // Start 60 FPS Camera Renderer
-      processAIFrames();                  // Start Async AI Engine
+      requestAnimationFrame(renderLoop);
+      processAIFrames();
     })();
   </script>
 </body>
