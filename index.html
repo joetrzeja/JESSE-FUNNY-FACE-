@@ -32,7 +32,7 @@
       background: #000;
     }
     
-    /* Video element sits in background for WebKit camera streaming */
+    /* Background Video element keeps mobile WebKit GPU pipeline active */
     video {
       position: absolute;
       top: 0; left: 0;
@@ -314,7 +314,11 @@
     let noFaceFrameCounter = 0;
     let customMaskImage = null;
     let activeCategory = 'all';
-    let isProcessingFrame = false;
+
+    // State Variables for Decoupled Loop
+    let latestRawLandmarks = null;
+    let latestMultiLandmarks = null;
+    let isAIProcessing = false;
 
     const MOOD_PRESETS = [
       { name: "Normal", filter: "none" },
@@ -467,7 +471,7 @@
         btn.onclick = () => {
           document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          currentFilterIndex = f.id; // Fixed: Sets exact filter ID
+          currentFilterIndex = f.id;
           filterLabel.innerText = f.name;
           playSound(f.sound);
           if (f.type === 'custom_upload' && !customMaskImage) {
@@ -801,8 +805,8 @@
       canvasCtx.restore();
     }
 
-    // Fixed Real-Time Pixel Warp Engine
     function applyPixelWarp(type, f, rawPts) {
+      if (!rawPts) return;
       const s = f.scale;
       const vW = videoElement.videoWidth || 1280;
       const vH = videoElement.videoHeight || 720;
@@ -812,7 +816,6 @@
         if (!mouthCenter) return;
         const radius = 65 * s;
 
-        // Video source cropping
         const cropW = 140;
         const cropH = 90;
         const srcX = Math.max(0, mouthCenter.x * vW - cropW / 2);
@@ -889,15 +892,16 @@
       canvasCtx.restore();
     }
 
-    // --- MediaPipe Callback Engine ---
-    function onResults(results) {
+    // --- 1. Dedicated 60 FPS Render Loop (Renders camera INSTANTLY) ---
+    function drawScene() {
+      if (videoElement.readyState < 2) return;
+
       const w = canvasElement.width;
       const h = canvasElement.height;
+      const imgW = videoElement.videoWidth || 1280;
+      const imgH = videoElement.videoHeight || 720;
 
-      const imgW = (results.image && results.image.width) ? results.image.width : (videoElement.videoWidth || 1280);
-      const imgH = (results.image && results.image.height) ? results.image.height : (videoElement.videoHeight || 720);
-
-      // Aspect Cover coordinate math
+      // Aspect Cover Calculations
       const aspectImg = imgW / imgH;
       const aspectCanvas = w / h;
       let drawW, drawH, dx, dy;
@@ -918,27 +922,23 @@
       canvasCtx.clearRect(0, 0, w, h);
       canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
 
-      const frameSource = (results.image && results.image.width > 0) ? results.image : videoElement;
-
+      // Draw Video Feed
       if (isFrontCamera) {
         canvasCtx.translate(w, 0);
         canvasCtx.scale(-1, 1);
-        canvasCtx.drawImage(frameSource, -dx, dy, drawW, drawH);
+        canvasCtx.drawImage(videoElement, -dx, dy, drawW, drawH);
       } else {
-        canvasCtx.drawImage(frameSource, dx, dy, drawW, drawH);
+        canvasCtx.drawImage(videoElement, dx, dy, drawW, drawH);
       }
       canvasCtx.restore();
 
       canvasCtx.filter = "none";
 
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        noFaceFrameCounter = 0;
-        faceReticle.style.display = 'none';
+      // Render Active Filter if Face Landmarks exist
+      if (latestMultiLandmarks && latestMultiLandmarks.length > 0) {
+        for (let i = 0; i < latestMultiLandmarks.length; i++) {
+          const rawPts = latestMultiLandmarks[i].landmark;
 
-        for (const faceLandmarks of results.multiFaceLandmarks) {
-          const rawPts = faceLandmarks.landmark;
-
-          // Compute exact screen coordinates
           const pts = rawPts.map(lm => {
             const screenX = isFrontCamera ? (w - (dx + lm.x * drawW)) : (dx + lm.x * drawW);
             const screenY = dy + lm.y * drawH;
@@ -967,14 +967,14 @@
 
           renderFilter(currentFilterIndex, { pts, nose, lEye: screenLeftEye, rEye: screenRightEye, mouth, forehead, scale, angle }, rawPts);
         }
-      } else {
-        noFaceFrameCounter++;
-        if (noFaceFrameCounter > 20) {
-          faceReticle.style.display = 'block';
-        }
       }
 
       drawWatermark(w, h);
+    }
+
+    function renderLoop() {
+      drawScene();
+      requestAnimationFrame(renderLoop);
     }
 
     function renderFilter(idx, f, rawPts) {
@@ -1037,7 +1037,21 @@
       });
     }
 
-    // Initialize MediaPipe FaceMesh
+    // --- 2. Decoupled AI Face Mesh Callback ---
+    function onResults(results) {
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        latestMultiLandmarks = results.multiFaceLandmarks;
+        noFaceFrameCounter = 0;
+        faceReticle.style.display = 'none';
+      } else {
+        noFaceFrameCounter++;
+        if (noFaceFrameCounter > 15) {
+          latestMultiLandmarks = null;
+          faceReticle.style.display = 'block';
+        }
+      }
+    }
+
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -1051,45 +1065,57 @@
 
     faceMesh.onResults(onResults);
 
-    // Camera Stream Initialization
+    // --- 3. Non-Blocking AI Process Loop ---
+    async function processAIFrames() {
+      if (videoElement.readyState >= 2 && !isAIProcessing) {
+        isAIProcessing = true;
+        try {
+          await faceMesh.send({ image: videoElement });
+        } catch (e) {
+          console.warn("Skipped AI frame", e);
+        }
+        isAIProcessing = false;
+      }
+      setTimeout(processAIFrames, 33); // ~30 FPS detection rate
+    }
+
+    // Camera Stream Loader
     async function startCamera() {
       if (videoElement.srcObject) {
         videoElement.srcObject.getTracks().forEach(track => track.stop());
       }
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: isFrontCamera ? 'user' : 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        });
+      let constraints = {
+        video: {
+          facingMode: isFrontCamera ? 'user' : 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
 
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         videoElement.srcObject = stream;
         await videoElement.play();
-        requestAnimationFrame(processFrame);
       } catch (err) {
-        alert("Camera permission denied or camera unavailable: " + err.message);
-      }
-    }
-
-    // Clean Processing Loop
-    async function processFrame() {
-      if (videoElement.readyState >= 2 && !isProcessingFrame) {
-        isProcessingFrame = true;
         try {
-          await faceMesh.send({ image: videoElement });
-        } catch (e) {
-          console.error("Tracking frame skipped", e);
+          // Fallback simple camera constraints if ideal resolution rejected
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          videoElement.srcObject = stream;
+          await videoElement.play();
+        } catch (fallbackErr) {
+          alert("Unable to access camera: " + fallbackErr.message);
         }
-        isProcessingFrame = false;
       }
-      requestAnimationFrame(processFrame);
     }
 
-    startCamera();
+    // Initialize App
+    (async function init() {
+      await startCamera();
+      requestAnimationFrame(renderLoop); // Start 60 FPS Camera Renderer
+      processAIFrames();                  // Start Async AI Engine
+    })();
   </script>
 </body>
 </html>
