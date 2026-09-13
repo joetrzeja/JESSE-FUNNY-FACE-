@@ -12,8 +12,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#000000">
 
-  <!-- Stable MediaPipe Bundles -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <!-- Stable MediaPipe Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
   <style>
@@ -33,6 +32,7 @@
       background: #000;
     }
     
+    /* Video element kept alive for mobile WebKit GPU pipeline */
     video {
       position: absolute;
       top: 0; left: 0;
@@ -47,7 +47,6 @@
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      object-fit: cover;
       z-index: 2;
     }
 
@@ -317,6 +316,7 @@
 
     let latestMultiLandmarks = null;
     let isAIProcessing = false;
+    let isFaceMeshReady = false;
 
     const MOOD_PRESETS = [
       { name: "Normal", filter: "none" },
@@ -803,9 +803,8 @@
       canvasCtx.restore();
     }
 
-    // Safely Clamped Pixel Warp Engine (Prevents DOMExceptions & WebKit Crashes)
     function applyPixelWarp(type, f, rawPts) {
-      if (!rawPts) return;
+      if (!rawPts || videoElement.readyState < 2) return;
       const s = f.scale;
       const vW = videoElement.videoWidth || 640;
       const vH = videoElement.videoHeight || 480;
@@ -815,28 +814,25 @@
         if (!mouthCenter) return;
         const radius = 65 * s;
 
-        const cropW = 140;
-        const cropH = 90;
+        const cropW = Math.min(vW * 0.3, 140);
+        const cropH = Math.min(vH * 0.2, 90);
 
-        // Strictly clamp source coordinates to valid video bounds
         const srcX = Math.max(0, Math.min(vW - cropW, mouthCenter.x * vW - cropW / 2));
         const srcY = Math.max(0, Math.min(vH - cropH, mouthCenter.y * vH - cropH / 2));
 
+        canvasCtx.save();
+        canvasCtx.beginPath();
+        canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
+        canvasCtx.clip();
+        
         try {
-          canvasCtx.save();
-          canvasCtx.beginPath();
-          canvasCtx.arc(f.mouth.x, f.mouth.y, radius, 0, 2 * Math.PI);
-          canvasCtx.clip();
-          
           canvasCtx.drawImage(
             videoElement,
             srcX, srcY, cropW, cropH,
             f.mouth.x - radius * 1.3, f.mouth.y - radius * 1.1, radius * 2.6, radius * 2.2
           );
-          canvasCtx.restore();
-        } catch (e) {
-          console.warn("Warp draw skipped safely", e);
-        }
+        } catch (e) {}
+        canvasCtx.restore();
       } else if (type === 'warp_eyes') {
         const radius = 45 * s;
         const eyeLandmarks = [rawPts[159], rawPts[386]];
@@ -846,26 +842,24 @@
           const rawEye = eyeLandmarks[i];
           if (!rawEye) return;
 
-          const cropW = 100;
-          const cropH = 80;
+          const cropW = Math.min(vW * 0.2, 100);
+          const cropH = Math.min(vH * 0.15, 80);
           const srcX = Math.max(0, Math.min(vW - cropW, rawEye.x * vW - cropW / 2));
           const srcY = Math.max(0, Math.min(vH - cropH, rawEye.y * vH - cropH / 2));
 
-          try {
-            canvasCtx.save();
-            canvasCtx.beginPath();
-            canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
-            canvasCtx.clip();
+          canvasCtx.save();
+          canvasCtx.beginPath();
+          canvasCtx.arc(eye.x, eye.y, radius, 0, 2 * Math.PI);
+          canvasCtx.clip();
 
+          try {
             canvasCtx.drawImage(
               videoElement,
               srcX, srcY, cropW, cropH,
               eye.x - radius * 1.4, eye.y - radius * 1.2, radius * 2.8, radius * 2.4
             );
-            canvasCtx.restore();
-          } catch (e) {
-            console.warn("Eye warp draw skipped safely", e);
-          }
+          } catch (e) {}
+          canvasCtx.restore();
         });
       }
     }
@@ -901,7 +895,7 @@
       canvasCtx.restore();
     }
 
-    // --- 60 FPS Instant Canvas Render Loop ---
+    // --- Core 60 FPS Render Pipeline ---
     function drawScene() {
       if (videoElement.readyState < 2) return;
 
@@ -910,31 +904,22 @@
       const imgW = videoElement.videoWidth || 640;
       const imgH = videoElement.videoHeight || 480;
 
-      const aspectImg = imgW / imgH;
-      const aspectCanvas = w / h;
-      let drawW, drawH, dx, dy;
-
-      if (aspectCanvas > aspectImg) {
-        drawW = w;
-        drawH = w / aspectImg;
-        dx = 0;
-        dy = (h - drawH) / 2;
-      } else {
-        drawH = h;
-        drawW = h * aspectImg;
-        dx = (w - drawW) / 2;
-        dy = 0;
-      }
+      // Aspect Cover Math
+      const scaleCover = Math.max(w / imgW, h / imgH);
+      const drawW = imgW * scaleCover;
+      const drawH = imgH * scaleCover;
+      const dx = (w - drawW) / 2;
+      const dy = (h - drawH) / 2;
 
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, w, h);
       canvasCtx.filter = MOOD_PRESETS[currentMoodIndex].filter;
 
-      // Render Camera background frame
+      // Fixed Camera Mirroring Math
       if (isFrontCamera) {
         canvasCtx.translate(w, 0);
         canvasCtx.scale(-1, 1);
-        canvasCtx.drawImage(videoElement, -dx, dy, drawW, drawH);
+        canvasCtx.drawImage(videoElement, dx, dy, drawW, drawH);
       } else {
         canvasCtx.drawImage(videoElement, dx, dy, drawW, drawH);
       }
@@ -942,13 +927,13 @@
 
       canvasCtx.filter = "none";
 
-      // Render Active Filter over Face Mesh
+      // Synchronized Filter Mapping
       if (latestMultiLandmarks && latestMultiLandmarks.length > 0) {
         for (let i = 0; i < latestMultiLandmarks.length; i++) {
           const rawPts = latestMultiLandmarks[i].landmark;
 
           const pts = rawPts.map(lm => {
-            const screenX = isFrontCamera ? (w - (dx + lm.x * drawW)) : (dx + lm.x * drawW);
+            const screenX = isFrontCamera ? (dx + (1 - lm.x) * drawW) : (dx + lm.x * drawW);
             const screenY = dy + lm.y * drawH;
             return { x: screenX, y: screenY };
           });
@@ -969,7 +954,7 @@
 
           const mouthOpenDist = Math.hypot(mouth.x - upperLip.x, mouth.y - upperLip.y);
           if (mouthOpenDist > 22 * scale && Date.now() - lastMouthSoundTime > 600) {
-            playSound(FILTER_LIST[currentFilterIndex].sound);
+            playSound(FILTER_LIST.find(f => f.id === currentFilterIndex)?.sound || 'pop');
             lastMouthSoundTime = Date.now();
           }
 
@@ -980,14 +965,26 @@
       drawWatermark(w, h);
     }
 
+    async function sendFrameToAI() {
+      if (isFaceMeshReady && videoElement.readyState >= 2 && !isAIProcessing) {
+        isAIProcessing = true;
+        try {
+          await faceMesh.send({ image: videoElement });
+        } catch (e) {
+          console.warn("AI Frame Skipped", e);
+        }
+        isAIProcessing = false;
+      }
+    }
+
     function renderLoop() {
       drawScene();
+      sendFrameToAI();
       requestAnimationFrame(renderLoop);
     }
 
     function renderFilter(idx, f, rawPts) {
-      const filter = FILTER_LIST[idx];
-      if (!filter) return;
+      const filter = FILTER_LIST.find(item => item.id === idx) || FILTER_LIST[0];
       const s = f.scale;
       const a = f.angle;
 
@@ -1045,47 +1042,39 @@
       });
     }
 
-    // MediaPipe FaceMesh Initialization
-    const faceMesh = new FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-    });
+    // MediaPipe FaceMesh Loader
+    let faceMesh = null;
+    try {
+      faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
 
-    faceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
 
-    faceMesh.onResults((results) => {
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        latestMultiLandmarks = results.multiFaceLandmarks;
-        noFaceFrameCounter = 0;
-        faceReticle.style.display = 'none';
-      } else {
-        noFaceFrameCounter++;
-        if (noFaceFrameCounter > 15) {
-          latestMultiLandmarks = null;
-          faceReticle.style.display = 'block';
+      faceMesh.onResults((results) => {
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          latestMultiLandmarks = results.multiFaceLandmarks;
+          noFaceFrameCounter = 0;
+          faceReticle.style.display = 'none';
+        } else {
+          noFaceFrameCounter++;
+          if (noFaceFrameCounter > 15) {
+            latestMultiLandmarks = null;
+            faceReticle.style.display = 'block';
+          }
         }
-      }
-    });
-
-    // Throttled Non-Blocking AI Processing Loop
-    async function processAIFrames() {
-      if (videoElement.readyState >= 2 && !isAIProcessing) {
-        isAIProcessing = true;
-        try {
-          await faceMesh.send({ image: videoElement });
-        } catch (e) {
-          console.warn("AI frame skipped", e);
-        }
-        isAIProcessing = false;
-      }
-      setTimeout(processAIFrames, 33);
+      });
+      isFaceMeshReady = true;
+    } catch (e) {
+      console.error("MediaPipe initialization error", e);
     }
 
-    // Camera Stream Initialization (640x480 ideal resolution prevents GPU freezes)
+    // Camera Stream Initialization
     async function startCamera() {
       if (videoElement.srcObject) {
         videoElement.srcObject.getTracks().forEach(track => track.stop());
@@ -1115,11 +1104,10 @@
       }
     }
 
-    // App Startup Sequence
+    // App Initialization
     (async function init() {
       await startCamera();
       requestAnimationFrame(renderLoop);
-      processAIFrames();
     })();
   </script>
 </body>
